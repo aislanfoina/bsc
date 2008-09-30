@@ -22,6 +22,8 @@ package br.usp.lme.smartv.bttest;
  */
 
 import java.io.IOException;
+import java.sql.Date;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Vector;
@@ -37,7 +39,8 @@ public class RemoteDeviceDiscovery {
 
     public static final Vector/*<RemoteDevice>*/ devicesDiscovered = new Vector();
     public static final BTPresenceList devicesPresent = new BTPresenceList();
-
+    static SimpleDateFormat stringData = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss:SS");
+    
     public static void main(String[] args) throws IOException, InterruptedException {
 
         final Object inquiryCompletedEvent = new Object();
@@ -57,15 +60,15 @@ public class RemoteDeviceDiscovery {
 //                System.out.println("Device " + btDevice.getBluetoothAddress() + " found");
                 	devicesDiscovered.addElement(btDevice);
                 	if(!devicesPresent.isPresent(btDevice.getBluetoothAddress())) {
-                		System.out.println("New Device Arrived! BTAddress = " + btDevice.getBluetoothAddress()+ "("+btDevice.getFriendlyName(false)+")");
-                		devicesPresent.add(new BTPresenceListComponent(btDevice.getBluetoothAddress()));
+                		System.out.println(stringData.format(new Date(System.currentTimeMillis()))+"  New BtTag Arrived! BTAddress = " + btDevice.getBluetoothAddress()+ "("+btDevice.getFriendlyName(false)+")");
+                		devicesPresent.add(new BTPresenceListComponent(btDevice.getBluetoothAddress(),btDevice.getFriendlyName(false)));
                 	}
                 } catch (IOException cantGetDeviceName) {
                 }
             }
 
             public void inquiryCompleted(int discType) {
-                System.out.println("Device Inquiry completed!");
+                System.out.println(stringData.format(new Date(System.currentTimeMillis()))+"  Device Inquiry completed!");
                 synchronized(inquiryCompletedEvent){
                     inquiryCompletedEvent.notifyAll();
                 }
@@ -96,7 +99,7 @@ public class RemoteDeviceDiscovery {
             			}
             		}
             		if (!isPresent) {
-            			System.out.println("Device left! BTAddress = " + btComponentTemp.getBtAddress());
+            			System.out.println(stringData.format(new Date(System.currentTimeMillis()))+"  BtTag left! BTAddress = " + btComponentTemp.getBtAddress()+ "("+btComponentTemp.getBtName()+")");
 //            			devicesPresent.remove(btComponentTemp.getBtAddress());
             			devicesPresent.remove(btComponentTemp); // FIXME
             		}

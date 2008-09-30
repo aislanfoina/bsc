@@ -4,6 +4,7 @@ import java.util.Date;
 
 public class BTPresenceListComponent {
 	protected String btAddress = "";
+	protected String btName = "";
 	protected Date time;
 	protected int flag = 0;
 
@@ -13,6 +14,12 @@ public class BTPresenceListComponent {
 
 	BTPresenceListComponent(String btAddress) {
 		this.btAddress = btAddress;
+		this.time = new Date(System.currentTimeMillis());
+	}
+
+	BTPresenceListComponent(String btAddress, String btName) {
+		this.btAddress = btAddress;
+		this.btName = btName;
 		this.time = new Date(System.currentTimeMillis());
 	}
 
@@ -63,6 +70,20 @@ public class BTPresenceListComponent {
 	 */
 	public void setTime(Date time) {
 		this.time = time;
+	}
+
+	/**
+	 * @return Returns the btName.
+	 */
+	public String getBtName() {
+		return btName;
+	}
+
+	/**
+	 * @param btName The btName to set.
+	 */
+	public void setBtName(String btName) {
+		this.btName = btName;
 	}
 	
 	
