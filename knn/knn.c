@@ -1,6 +1,11 @@
+//#define CELL
+
+#ifdef CELL
 #include <spu_intrinsics.h>
 #include <css_malloc.h>
 #include <css_dma_red.h>
+#endif
+
 #include <sys/time.h>
 #include <malloc.h>
 #include <stdlib.h>
@@ -50,8 +55,13 @@ void compare (int     K,
   //  prof_cp30();
   //prof_cp0();
   //loop data
+#ifdef CELL
   short loopsize = RECORD_SIZE / 12;
   short extra = RECORD_SIZE % 12;
+#else
+  short loopsize = 0;
+  short extra = RECORD_SIZE;
+#endif
   float *record = Data;
   float *train = Train;
   float distance=0;
@@ -60,6 +70,7 @@ void compare (int     K,
   record=Data;
   short set=0;
   short Xset=0;
+#ifdef CELL
   vector float result;
   vector float Bresult;
   vector float Cresult;
@@ -69,6 +80,7 @@ void compare (int     K,
   vector float* varray1;
   vector float* varray2;
   vector float* Xvarray2;
+#endif
   float Bdis;
   float Cdis;
   float XBdis;
@@ -80,7 +92,9 @@ void compare (int     K,
   for(i=0;i<data_size;i++) //for each data point
     {
       //printf("looking at record %d\n",i);
+#ifdef CELL
       varray1 = (vector float*)record;
+#endif
       unsigned short w = i*RECORD_SIZE;
       //reset training data
       train=Train;
@@ -90,6 +104,7 @@ void compare (int     K,
           Xdistance=0;
           set=0;
           Xset=0;
+#ifdef CELL
           varray2 = (vector float*)train;
           Xvarray2 = (vector float*)(train+RECORD_SIZE+1);
           for(k=0;k<len;k+=3)
@@ -117,6 +132,7 @@ void compare (int     K,
               Xdistance +=XBdis+XCdis;
 
             }
+#endif
           if(__builtin_expect((extra > 0),0))
             {
               //printf("here\n");
