@@ -1,17 +1,26 @@
+//#define CELL	//Define it if the code will be compiled using the CellSs
+#ifdef CELL
 #include <spu_intrinsics.h>
+#endif
+
 #include <sys/time.h>
 #include <malloc.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
+
+//#define REPORT	// Show report in the end of the code.
+//#define DEBUG	// Debug messages
+//#define PAUSE	// Stop during the iterations
+
 /*
  * When the ratio of record movement across custers (led by centroids) hits
  * this low bound, the algorithms does not perform any more iterations.
  */
-// Aislan: Threshold reduced from 0.01f to 0.0001f
+// Aislan: Threshold reduced from 0.01f to 0.001f
 
-#define TERMINATION_THRESHOLD  0.0001f
+#define TERMINATION_THRESHOLD  0.001f
 
 /*
  * Iteration hard limit.
@@ -61,8 +70,17 @@ int compare_to_centers(float *record, int dimension, int number_of_centers,
 	float min = 1e18;
 	short blocksize = 12;
 
+#ifdef CELL
+
 	short loopcount = dimension / blocksize;
 	short extra = dimension % blocksize;
+
+#else
+
+	short loopcount = 0;
+	short extra = dimension;
+
+#endif
 
 	float *recordsPointer = record;
 
@@ -98,42 +116,51 @@ int compare_to_centers(float *record, int dimension, int number_of_centers,
 	//for each 4 centers.
 	//Aislan: Removed the -4 sub in the condition of the loop.
 
+
+
 	for (k = 0; k < number_of_centers; k += 4) {
+
+
 		distance_3 = 0.0;
 		distance_4 = 0.0;
 		distance_5 = 0.0;
+#ifdef CELL
 		vector float* varray1 = (vector float*)(recordsPointer);
 		vector float* varray2 = (vector float*)(center1);
 		vector float result1;
 		vector float result2;
 		vector float result3;
-
+#endif
 		Cdistance_3 = 0.0;
 		Cdistance_4 = 0.0;
 		Cdistance_5 = 0.0;
+#ifdef CELL
 		vector float* Cvarray2 = (vector float*)(center2);
 		vector float Cresult1;
 		vector float Cresult2;
 		vector float Cresult3;
-
+#endif
 		Ddistance_3 = 0.0;
 		Ddistance_4 = 0.0;
 		Ddistance_5 = 0.0;
+#ifdef CELL
 		vector float* Dvarray2 = (vector float*)(center3);
 		vector float Dresult1;
 		vector float Dresult2;
 		vector float Dresult3;
-
+#endif
 		Edistance_3 = 0.0;
 		Edistance_4 = 0.0;
 		Edistance_5 = 0.0;
+#ifdef CELL
 		vector float* Evarray2 = (vector float*)(center4);
 		vector float Eresult1;
 		vector float Eresult2;
 		vector float Eresult3;
 		vector float temp,Ctemp,Dtemp,Etemp;
+#endif
 		int index = 0;
-
+#ifdef CELL
 		//accumulators
 		vector float C1acc = {0,0,0,0};
 		vector float C2acc = {0,0,0,0};
@@ -218,7 +245,15 @@ int compare_to_centers(float *record, int dimension, int number_of_centers,
 		Edistance = spu_extract(C4acc, 0) + spu_extract(C4acc, 1)
 				+ spu_extract(C4acc, 2) + spu_extract(C4acc, 3);
 
+
+
 		if (__builtin_expect((extra > 0), 0)) { // For each remaining dimension, do one loop of this.
+#else
+			distance = 0;
+			Cdistance = 0;
+			Ddistance = 0;
+			Edistance = 0;
+#endif
 			for (i = 0; i < extra; i++) { // TODO: SIMD it.
 				float distance1 = recordsPointer[index + i]	- center1[index + i];
 				distance += distance1 * distance1;
@@ -228,9 +263,25 @@ int compare_to_centers(float *record, int dimension, int number_of_centers,
 				Ddistance += Ddistance1 * Ddistance1;
 				float Edistance1 = recordsPointer[index + i] - center4[index + i];
 				Edistance += Edistance1 * Edistance1;
-			}
-		}
 
+#ifdef DEBUG
+		printf("  *distance[id %d] = %f \n",k,distance);
+	    printf("  *Cdistance[id %d] = %f \n",k+1,Cdistance);
+	    printf("  *Ddistance[id %d] = %f \n",k+2,Ddistance);
+	    printf("  *Edistance[id %d] = %f \n",k+3,Edistance);
+#endif
+
+			}
+#ifdef CELL
+		}
+#endif
+
+#ifdef DEBUG
+		printf("distance[id %d] = %f \n",k,distance);
+	    printf("Cdistance[id %d] = %f \n",k+1,Cdistance);
+	    printf("Ddistance[id %d] = %f \n",k+2,Ddistance);
+	    printf("Edistance[id %d] = %f \n",k+3,Edistance);
+#endif
 		/* this is made spu_sel by the compiler */
 		// Aislan: Added the validation in case of the k % 4 > 0, for the invalid memory positions.
 		// TODO: Improve it!!!
@@ -252,11 +303,20 @@ int compare_to_centers(float *record, int dimension, int number_of_centers,
 			min = Edistance;
 		}
 
-		center1 += dimension * 4;
+#ifdef DEBUG
+	    printf("\n  *minDistance[id %d] = %f\n\n",min_id,min);
+#endif
+
+	    center1 += dimension * 4;
 		center2 += dimension * 4;
 		center3 += dimension * 4;
 		center4 += dimension * 4;
 	} //for each center mod 4
+
+#ifdef DEBUG
+	    printf("\nminDistance[id %d] = %f\n\n",min_id,min);
+#endif
+
 	return min_id;
 }
 
@@ -395,11 +455,19 @@ int main(int argc, char **argv) {
 		return 2;
 	}
 
+#ifdef CELL
+
 	env_num_spus = getenv("CSS_NUM_SPUS");
 	if (env_num_spus != NULL)
 		CSS_NUM_SPUS = atoi(env_num_spus);
 	else
 		CSS_NUM_SPUS = 8;
+
+#else
+
+	CSS_NUM_SPUS = 1;
+
+#endif
 
 	block_size = DIMENSIONS * sizeof(float);
 	block_records = 1;
@@ -448,7 +516,11 @@ int main(int argc, char **argv) {
 	/* Make record data */
 	for (i = 0; i < NUMBER_OF_RECORDS; i++)
 		for (j = 0; j < DIMENSIONS; j++)
+#ifdef DEBUG
+			records[i * DIMENSIONS + j] = rand() % 20;
+#else
 			records[i * DIMENSIONS + j] = rand() / 100000.0f + j;
+#endif
 
 	/* Initialize the centers */
 	for (i = 0; i < CENTERS; i++)
@@ -497,6 +569,10 @@ int main(int argc, char **argv) {
 		iteration++;
 		printf("EXECUTING ITERATION #%d\n", iteration);
 
+#ifdef PAUSE
+		scanf("%d");
+#endif
+
 #pragma css barrier
 
 		changed = 0;
@@ -523,9 +599,11 @@ int main(int argc, char **argv) {
 
 #pragma css finish
 
+#ifdef REPORT
+
     printf("\n######### REPORT #########\n\n");
 
-    if((DIMENSIONS < 10) && (NUMBER_OF_RECORDS < 100)) {
+//    if((DIMENSIONS < 10) && (NUMBER_OF_RECORDS < 100)) {
 		for (i = 0;  i < NUMBER_OF_RECORDS;  i++) {
 			pVector("PNTf",i,&records[i*DIMENSIONS],DIMENSIONS);
 			printf(" CNTid = %d\n",assigned_centers[i]);
@@ -536,7 +614,9 @@ int main(int argc, char **argv) {
 			pVector("CNTf",i,&centers[i*DIMENSIONS],DIMENSIONS);
 			printf("\n");
 		}
-    }
+//    }
+
+#endif
 
 	printf("\nNumber of ITERATIONS = #%d\n", iteration);
 
