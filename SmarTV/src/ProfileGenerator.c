@@ -11,11 +11,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <mysql.h>
 
 int main(void) {
 
- 	int ids[] = { 123126, 2118461 };
+ 	int ids[] = { 123126, 2118461, 1932594, 2143500, 1977959 };
 
  	int numgens = 28;
 
@@ -53,7 +54,7 @@ int main(void) {
 	mysql_free_result(res);
 
 	int i;
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < (sizeof(ids)/sizeof(int)); i++) {
 		int id = ids[i];
 
 		/* send SQL query */
@@ -74,6 +75,10 @@ int main(void) {
 			/* output table name */
 			printf("%d ratings returned for the user [%d]:\n",numrows,id);
 
+			float totalMean = 0;
+			float totalStd = 0;
+			int totalCount = 0;
+
 			int genCounter[numgens];
 			memset(genCounter, 0, numgens*sizeof(int));
 			int genPosCounter[numgens];
@@ -84,8 +89,8 @@ int main(void) {
 			memset(genRate, 0, numgens*sizeof(int));
 			float genMean[numgens];
 			memset(genMean, 0, numgens*sizeof(float));
-			float genNormals[numgens];
-			memset(genNormals, 0, numgens*sizeof(float));
+			float genStd[numgens];
+			memset(genStd, 0, numgens*sizeof(float));
 
 			while ((row = mysql_fetch_row(res)) != NULL) {
 				int rate = atoi(row[0]);
@@ -98,6 +103,12 @@ int main(void) {
 
 				genCounter[genId]++;
 				genRate[genId]+=rate;
+				genStd[genId]+=rate*rate;
+
+				totalCount++;
+				totalMean+=rate;
+				totalStd+=rate*rate;
+
 				if(rate > 3)
 					genPosCounter[genId]++;
 				else if(rate < 3)
@@ -106,22 +117,59 @@ int main(void) {
 			int k;
 
 			for (k = 0; k < numgens; k++)
-				if(genCounter[k] != 0)
+				if(genCounter[k] != 0) {
 					genMean[k] = (float) genRate[k]/ (float) genCounter[k];
+					genStd[k] = sqrt((genStd[k]/ (float) genCounter[k])-(genMean[k]*genMean[k]));
+				}
+			totalMean = totalMean/(float) totalCount;
+			totalStd = sqrt((totalStd/totalCount)-(totalMean*totalMean));
 
 			printf("Genres: \t");
 			for (k = 0; k < numgens; k++) {
 				char *genreName;
 				genreName = (char *) malloc (64 * sizeof(char));
 
-				translateIdGenre(k, genreName);
+				if (translateIdGenre(k, genreName) == -1) {
+					fprintf(stderr, "Impossible to translate Genre ID %s\n", k);
+					exit(1);
+				}
 				printf("%s\t",genreName);
 			}
+			printf("\nRateCounter: \t");
+			for (k = 0; k < numgens; k++)
+				printf("%d\t",genCounter[k]);
+
+			printf("\nRatePosCounter: \t");
+			for (k = 0; k < numgens; k++)
+				printf("%d\t",genPosCounter[k]);
+
+			printf("\nRateNegCounter: \t");
+			for (k = 0; k < numgens; k++)
+				printf("%d\t",genNegCounter[k]);
+
+			printf("\nRatePosMinusNegCounter: \t");
+			for (k = 0; k < numgens; k++)
+				printf("%d\t",genPosCounter[k]-genNegCounter[k]);
+
 			printf("\nMeanRate: \t");
 			for (k = 0; k < numgens; k++)
 				printf("%f\t",genMean[k]);
 
-			printf("End of user %d processing\n",id);
+			printf("\nSTDRate: \t");
+			for (k = 0; k < numgens; k++)
+				printf("%f\t",genStd[k]);
+
+			printf("\nNormalizedRate: \t");
+			for (k = 0; k < numgens; k++)
+				printf("%f\t",(genMean[k]-totalMean)/totalStd);
+
+			printf("\n\n");
+
+			printf("TotalCount: \t %d\n",totalCount);
+			printf("TotalMean: \t %f\n",totalMean);
+			printf("TotalStd: \t %f\n",totalStd);
+
+			printf("\nEnd of user %d processing\n",id);
 			/* close connection */
 			mysql_free_result(res);
 		}
@@ -194,7 +242,7 @@ int translateGenreId(char *genreName) {
 		return -1;
 }
 
-void translateIdGenre(int genreId, char *genreName) {
+int translateIdGenre(int genreId, char *genreName) {
 	char genre[64];
 
 	if(genreId == 0)
@@ -253,8 +301,11 @@ void translateIdGenre(int genreId, char *genreName) {
 		strcpy(genre,"War");
 	else if(genreId == 26)
 		strcpy(genre,"Western");
-	else
+	else {
 		strcpy(genre,"Invalid ID!");
+		return -1;
+	}
 
 	strcpy(genreName, genre);
+	return 1;
 }
