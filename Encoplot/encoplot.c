@@ -6,12 +6,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define insidetasks
-
 typedef int t_int;
 
-typedef int word_t;
-//typedef __uint128_t word_t;
+//typedef int word_t;
+typedef __uint128_t word_t;
 //typedef __uint64_t word_t;
 //typedef __uint32_t word_t;
 
@@ -43,127 +41,8 @@ double maintime_int(int print) {
 
 
 
-
-
-//task1 - independent - input NN inout inputArray
-#pragma css task input (size, offset) \
-                 output (array[size])
-
-void init_inputArray_task(t_int *array, int size, int offset) {
-	int i;
-	for(i=0;i < size; i++)
-		array[i] = i+offset;
-}
-
-//task2 - independent - input RANGE inout counters
-#pragma css task input (size, offset) \
-	             output (counters[size])
-
-void init_counters_task (t_int *counters, int size, int offset) {
-	int k;
-	for(k=0; k < size; k++)
-		counters[k] = 0;
-}
-
-//task3 histogram - reduction - input NN, buffer inout counters
-#pragma css task input (size, offset, cntsize, bufsize, buffer[bufsize]) inout (counters[cntsize]) reduction (counters[cntsize])
-
-void counters_load_task(t_int *counters, int cntsize, unsigned char *buffer, int bufsize, int size, int offset) {
-	int i;
-
-	t_int localcounters[cntsize];
-	memset(localcounters, 0, cntsize * sizeof(t_int));
-
-	for(i=offset; i < size; i++) {
-		localcounters[*(buffer + i)]++;
-	}
-#pragma css mutex lock (counters)
-	for(i=0; i < cntsize; i++)
-		counters[i] += localcounters[i];
-#pragma css mutex unlock (counters)
-
-}
-
-//task4 - nonparallel
-#pragma css task input (size, counters[size]) \
-	             output (startpos[size])
-
-void init_startpos_task(t_int *startpos, t_int *counters, int size) {
-	t_int sp = 0;
-	int k;
-
-	for(k = 0; k < size; k++) {
-		startpos[k] = sp;
-		sp += counters[k];
-	}
-}
-/*
-//task 5 major loop
-#pragma css task input (size, ofs, bufsize, OFFSET, CPYCHAR, NUMCPYCHAR) \
-				 input (buffer[bufsize], inputArray[size]) \
-	             output (outputArray[NUMCPYCHAR])
-
-void load_outputArray_task(t_int *inputArray, t_int *outputArray, unsigned char *buffer, int bufsize, int size, int ofs, int OFFSET, unsigned char CPYCHAR, int NUMCPYCHAR) {
-	int i;
-	int offset_counter = 0;
-	int copy_counter = 0;
-
-	for(i = 0; i < size; i++) {
-		unsigned char c = buffer[ofs + inputArray[i]];
-		if (c == CPYCHAR) {
-			if(offset_counter < OFFSET)
-				offset_counter++;
-			else {
-				outputArray[copy_counter] = inputArray[i];
-				copy_counter++;
-				if(copy_counter == NUMCPYCHAR)
-					break;
-			}
-		}
-	}
-}
-*/
-
-//task 5 major loop
-#pragma css task input (size, ofs, bufsize, OFFSET, CPYCHAR, NUMCPYCHAR) \
-				 input (buffer[bufsize], inputArray[size]) \
-	             output (outputArray[NUMCPYCHAR])
-
-void load_outputArray_task(t_int *inputArray, t_int *outputArray, unsigned char *buffer, int bufsize, int size, int ofs, int OFFSET, unsigned char CPYCHAR, int NUMCPYCHAR) {
-	int i;
-	int offset_counter = 0;
-	int copy_counter = 0;
-
-	for(i = 0; i < size; i++) {
-		unsigned char c = buffer[ofs + inputArray[i]];
-		if (c == CPYCHAR) {
-			if(offset_counter < OFFSET)
-				offset_counter++;
-			else {
-				outputArray[copy_counter] = inputArray[i];
-				copy_counter++;
-				if(copy_counter == NUMCPYCHAR)
-					break;
-			}
-		}
-	}
-}
-
-
-
-#pragma css task input (SIZE, typeSize, orig[SIZE]) \
-                 output (dst[SIZE])
-
-void memcpy_task(t_int *dst, t_int *orig, int SIZE, int typeSize){
-	memcpy(dst, orig, SIZE * typeSize);
-}
-
-
-
-#ifndef insidetasks
 #pragma css task input (buffer[numlines], numlines, DEPTH) \
 	             output (index[numlines])
-#endif
 
 void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *index) {
 	int NN = numlines - DEPTH + 1;
@@ -180,107 +59,36 @@ void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *i
 
 		int i, j, k;
 
-#ifndef insidetasks
 
 		for(i=0;i < NN; i++)
 			inputArray[i] = i;
-#else
-		//task1 - independent - input NN inout inputArray
-		int block_records = 500000;
-		int chunk_of_records = 0;
-
-		for (k = 0; k < NN; k += block_records) {
-			chunk_of_records = (k + block_records > NN ? NN - k : block_records);
-			init_inputArray_task(&inputArray[k], chunk_of_records, k);
-		}
-#endif
 		//radix sort, the input is x, the output rank is ix
 		//counters
 
-#ifndef insidetasks
 
 		for(k=0; k < RANGE; k++)
 			counters[k] = 0;
 
-#else
-
-		//task2 - independent - input RANGE inout counters
-		init_counters_task(counters, RANGE, 0);
-#endif
-
-#ifndef insidetasks
 
 		for(i=0; i < NN; i++)
 			counters[*(buffer + i)]++;
 
-#else
-
-		//task3 histogram - reduction - input NN, buffer inout counters
-		for (k = 0; k < NN; k += block_records) {
-			chunk_of_records = (k + block_records > NN ? NN - k : block_records);
-			counters_load_task(counters, RANGE, buffer, numlines, k+chunk_of_records, k);
-		}
-
-#endif
 
 		for(j=0; j < DEPTH; j++) {
 			int ofs = j;//low endian
 			t_int sp = 0;
-
-#ifndef insidetasks
 
 			for(k = 0; k < RANGE; k++) {
 				startpos[k] = sp;
 				sp += counters[k];
 			}
 
-#else
-
-			//task 4
-			init_startpos_task(startpos, counters, RANGE);
-#endif
-
-#ifndef insidetasks
-
 			for(i = 0; i < NN; i++) {
 				unsigned char c = buffer[ofs + inputArray[i]];
 				outputArray[startpos[c]++] = inputArray[i];
 			}
-#else
-			//task 5 major loop - task reduction
-
-/*#pragma css wait on (outputArray, inputArray)
-
-			for (k = 0; k < NN; k += block_records) {
-				chunk_of_records = (k + block_records > NN ? NN - k : block_records);
-				load_outputArray_task(&inputArray[k], outputArray, startpos, RANGE, buffer, numlines, chunk_of_records, ofs);
-			}
-*/
-#pragma css barrier
-
-			for (i = 0; i < RANGE; i++) {
-				for(k = 0; k < counters[i]; k+= block_records) {
-					chunk_of_records = (k + block_records > counters[i] ? counters[i] - k : block_records);
-					load_outputArray_task(inputArray, &outputArray[startpos[i]+k], buffer, numlines, NN, ofs, k, i, chunk_of_records);
-				}
-			}
-#pragma css barrier
-
-#endif
-#ifndef insidetasks
 
 			memcpy(inputArray, outputArray, NN * sizeof(inputArray[0]));
-
-#else
-
-#pragma css wait on (outputArray)
-
-			for (k = 0; k < NN; k += block_records) {
-				chunk_of_records = (k + block_records > NN ? NN - k : block_records);
-				memcpy_task(&inputArray[k], &outputArray[k], chunk_of_records, sizeof(inputArray[0]));
-			}
-#pragma css barrier
-#endif
 
 			//update counters
 			if (j < DEPTH - 1) {
@@ -290,18 +98,7 @@ void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *i
 
 		}
 
-#ifndef insidetasks
-
 		memcpy(index, inputArray, NN * sizeof(inputArray[0]));
-#else
-
-#pragma css wait on (inputArray)
-
-		for (k = 0; k < NN; k += block_records) {
-			chunk_of_records = (k + block_records > NN ? NN - k : block_records);
-			memcpy_task(&index[k], &inputArray[k], chunk_of_records, sizeof(inputArray[0]));
-		}
-#endif
 		free(outputArray);
 	} else
 		index = NULL;
