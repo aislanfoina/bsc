@@ -1,0 +1,1 @@
+teste do sistema de comparacao de palavras do encode.
