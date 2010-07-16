@@ -158,87 +158,7 @@ void memcpy_task(t_int *dst, t_int *orig, int SIZE, int typeSize){
 }
 
 
-void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *index, int *counter_output, int *startpos_output) {
-	const int RANGE = 256;
-
-	int a, b, c;
-	int i, j, k;
-
-//	int big_block_records = 60;
-	int big_block_records = 2000000;
-	int block_records = 500000;
-	int chunk_of_records = 0;
-
-	if(numlines > big_block_records+DEPTH) {
-		int pages = (int)ceil((float)numlines/(float)big_block_records);
-		t_int **index_pages;
-		t_int **counter_pages;
-		t_int **startpos_pages;
-
-		index_pages = malloc(pages*sizeof(t_int*));
-		counter_pages = malloc(pages*sizeof(t_int*));
-		startpos_pages = malloc(pages*sizeof(t_int*));
-		b = 0;
-		for (a = 0; a < numlines; a += big_block_records) {
-			int chunk_of_records = (a + big_block_records > numlines ? numlines - a : big_block_records + DEPTH - 1);
-			index_pages[b] = (t_int*) malloc(chunk_of_records * sizeof(t_int));
-			counter_pages[b] = (t_int*) malloc(RANGE * sizeof(t_int));
-			startpos_pages[b] = (t_int*) malloc(RANGE * sizeof(t_int));
-
-			simpler_rsort4ngrams(&buffer[a], chunk_of_records, DEPTH, index_pages[b], counter_pages[b], startpos_pages[b]);
-
-			if(a > 0) {
-				for(c = 0; c < chunk_of_records; c++)
-					index_pages[b][c] += a;
-			}
-			b++;
-		}
-//		printf("Merge\n");
-		int NN = numlines - DEPTH + 1;
-		t_int *inputArray = (t_int*) malloc(NN * sizeof(t_int));
-
-		t_int counters[RANGE];
-		t_int startpos[RANGE];
-
-		//task2 - independent - input RANGE inout counters
-		init_counters_task(counters, RANGE, 0);
-
-		//task3 histogram - reduction - input NN, buffer inout counters
-
-		for (k = 0; k < NN; k += block_records) {
-			chunk_of_records = (k + block_records > NN ? NN - k : block_records);
-			counters_load_task(counters, RANGE, buffer, numlines, k+chunk_of_records, k);
-		}
-
-		unsigned char *pin = buffer + NN;
-		unsigned char *pout = buffer;
-		for (j = 0; j < DEPTH - 1; j++) {
-			counters[*pout++]--;
-			counters[*pin++]++;
-		}
-
-		//task 4
-		init_startpos_task(startpos, counters, RANGE);
-
-		for (i = 0; i < RANGE; i++) {
-			int offset = 0;
-			for (j = 0; j < pages; j++) {
-				if(counter_pages[j][i] > 0) {
-//					printf("i = %d, j = %d, startpos[i] = %d, offset = %d\n", i, j, startpos[i], offset);
-//					printf("startpos_pages[j][i] = %d, index_pages[j][startpos_pages[j][i]] = %d, counter_pages[j][i] = %d\n",startpos_pages[j][i],index_pages[j][startpos_pages[j][i]], counter_pages[j][i]);
-//					printf("startpos[i+1] = %d, startpos_pages[j][i+1] = %d, counter_pages[j][i+1] = %d\n", startpos[i+1], startpos_pages[j][i+1], counter_pages[j][i+1]);
-				}
-				memcpy_task(&index[startpos[i]+offset], &index_pages[j][startpos_pages[j][i]], counter_pages[j][i], sizeof(t_int));
-				if(counter_pages[j][i] > 0) {
-//					printf("Copied!\n");
-				}
-				offset += counter_pages[j][i];
-			}
-		}
-		return;
-	}
-	else {
-
+void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *index) {
 	int NN = numlines - DEPTH + 1;
 
 	if (NN > 0) {
@@ -247,20 +167,39 @@ void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *i
 		typedef int t_int;
 		t_int *inputArray = (t_int*) malloc(NN * sizeof(t_int));
 		t_int *outputArray = (t_int*) malloc(NN * sizeof(t_int));
+		const int RANGE = 256;
 		t_int counters[RANGE];
 		t_int startpos[RANGE];
 
+		int block_records = 500000;
+		int part_records = 2000000;
+		int parts = (int) ceil((float) numlines/ (float) part_records);
+		int NN_part[parts];
 
+		t_int counters_part[parts][RANGE];
+		t_int startpos_part[parts][RANGE];
+		t_int *inputArrayPart[parts];
+		t_int *outputArrayPart[parts];
 
+		int chunk_of_records = 0;
+		int i, j, k;
 
+		int l,m;
 
+		for(l = 0; l < parts; l++) {
+			chunk_of_records = (l * part_records > numlines ? numlines - (l*part_records) - DEPTH + 1: part_records);
+			NN_part[l] = chunk_of_records;
+			inputArrayPart[l] = (t_int*) malloc(NN_part[l] * sizeof(t_int));
+			outputArrayPart[l] = (t_int*) malloc(NN_part[l] * sizeof(t_int));
+		}
 
 
 		//task1 - independent - input NN inout inputArray
-		  for (k = 0; k < NN; k += block_records) {
-  			chunk_of_records = (k + block_records > NN ? NN - k : block_records);
-			init_inputArray_task(&inputArray[k], chunk_of_records, k);
+		for (l = 0; l < parts; l++) {
+		  for (k = 0; k < NN_part; k += block_records) {
+			init_inputArray_task(&inputArrayPart[l][k], chunk_of_records, k);
 		  }
+		}
 
 
 		//radix sort, the input is x, the output rank is ix
@@ -270,12 +209,17 @@ void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *i
 		//task2 - independent - input RANGE inout counters
 		init_counters_task(counters, RANGE, 0);
 
+		for (l = 0; l < parts; l++)
+			init_counters_task(counters_part[l], RANGE, 0);
+
 
 		//task3 histogram - reduction - input NN, buffer inout counters
 
-		for (k = 0; k < NN; k += block_records) {
-			chunk_of_records = (k + block_records > NN ? NN - k : block_records);
-			counters_load_task(counters, RANGE, buffer, numlines, k+chunk_of_records, k);
+		for (l = 0; l < parts; l++) {
+			for (k = 0; k < NN_part[l]; k += block_records) {
+				chunk_of_records = (k + block_records > NN_part[l] ? NN_part[l] - k : block_records);
+				counters_load_task(counters[l], RANGE, &buffer[l*part_records], numlines, k+chunk_of_records, k);
+			}
 		}
 
 		for(j=0; j < DEPTH; j++) {
@@ -284,12 +228,16 @@ void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *i
 
 
 			//task 4
-			init_startpos_task(startpos, counters, RANGE);
+			for (l = 0; l < parts; l++) {
+				init_startpos_task(startpos[l], counters[l], RANGE);
+			}
+
 
 			//task 5 major loop - task reduction
 
 #pragma css barrier
 
+			for(l = 0; l < parts; )
 			for (i = 0; i < RANGE; i++) {
 				for(k = 0; k < counters[i]; k+= block_records) {
 					chunk_of_records = (k + block_records > counters[i] ? counters[i] - k : block_records);
@@ -316,9 +264,6 @@ void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *i
 
 #pragma css wait on (inputArray)
 
-		memcpy_task(counter_output, counters, RANGE, sizeof(t_int));
-		memcpy_task(startpos_output, startpos, RANGE, sizeof(t_int));
-
 		for (k = 0; k < NN; k += block_records) {
 			chunk_of_records = (k + block_records > NN ? NN - k : block_records);
 			memcpy_task(&index[k], &inputArray[k], chunk_of_records, sizeof(inputArray[0]));
@@ -328,7 +273,6 @@ void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *i
 
 	} else
 		index = NULL;
-	}
 }
 
 #define MAXBUFSIZ 8000123
@@ -357,14 +301,10 @@ int main(int argc, char ** argv) {
 
 	//index the ngrams
 	t_int *index1 = (t_int*) malloc(numlines1 * sizeof(t_int));
-	t_int *counter1 = (t_int*) malloc(256 * sizeof(t_int));
-	t_int *startpos1 = (t_int*) malloc(256 * sizeof(t_int));
 	t_int *index2 = (t_int*) malloc(numlines2 * sizeof(t_int));
-	t_int *counter2 = (t_int*) malloc(256 * sizeof(t_int));
-	t_int *startpos2 = (t_int*) malloc(256 * sizeof(t_int));
 
-	simpler_rsort4ngrams(bufferfile1, numlines1, depth, index1, counter1, startpos1);
-	simpler_rsort4ngrams(bufferfile2, numlines2, depth, index2, counter2, startpos2);
+	simpler_rsort4ngrams(bufferfile1, numlines1, depth, index1);
+	simpler_rsort4ngrams(bufferfile2, numlines2, depth, index2);
 
 #pragma css barrier
 
