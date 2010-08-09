@@ -9,6 +9,9 @@ public class Movie {
 	String origName;
 	String year;
 	
+	String foundName;
+	String foundYear;
+	
 	String Category;
 	String Genre1;
 	String Genre2;
@@ -40,6 +43,10 @@ public class Movie {
 	}
 
 	public int search (String type, Connection conn) {
+		return this.search(type, conn, false);
+	}
+	
+	public int search (String type, Connection conn, boolean force) {
 		boolean found = true;
 		int returnVal = 0;
 		
@@ -74,7 +81,15 @@ public class Movie {
 				String movieYear = searchResult.substring(searchResult.indexOf("<td class=\"cell\" style=\"width: 70px;\">"));
 				movieYear = movieYear.substring(movieYear.indexOf(">")+1,movieYear.indexOf("</td>"));
 				
-				if(checkAge(year, movieYear)) {
+				this.foundYear = movieYear;
+				
+				boolean goThrough = false;
+				if(force) {
+					if(movieYear.equals(""))
+						goThrough = true;
+				}
+				
+				if(checkAge(year, movieYear) || goThrough) {
 					output = DMSCommunicator.httpSendXml(movieUrl);
 					int indexCategory = output.indexOf(">Category<");
 					if (indexCategory != 0) {
@@ -280,6 +295,20 @@ public class Movie {
 	 */
 	public void setMaxAge_tol(int maxAge_tol) {
 		this.maxAge_tol = maxAge_tol;
+	}
+
+	/**
+	 * @return Returns the foundYear.
+	 */
+	public String getFoundYear() {
+		return foundYear;
+	}
+
+	/**
+	 * @param foundYear The foundYear to set.
+	 */
+	public void setFoundYear(String foundYear) {
+		this.foundYear = foundYear;
 	}
 	
 }
