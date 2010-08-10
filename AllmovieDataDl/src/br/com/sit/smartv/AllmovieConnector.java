@@ -86,11 +86,12 @@ public class AllmovieConnector {
 								cnt4++;
 								okcnt++;
 								ok = true;
-							} else if (ret == 2) {
-								if (movie.getFoundYear().equals("")) {
-									workYear0 = true;
-								}
 							} else {
+								if (ret == 2) {
+									if (movie.getFoundYear().equals("")) {
+										workYear0 = true;
+									}
+								}
 								boolean dvdYear0 = false;
 								ret = movie.search("dvd", conn);
 								if (ret == 0) {
@@ -145,6 +146,7 @@ public class AllmovieConnector {
 				movie.save(conn);
 
 				if (totalcnt % 25 == 0) {
+					System.out.println();
 					System.out.println("Total:          " + totalcnt);
 					System.out.println();
 					System.out.println("Ok:             " + okcnt);
@@ -158,6 +160,8 @@ public class AllmovieConnector {
 					System.out.println("Cnt3:       " + cnt3);
 					System.out.println("Cnt4:       " + cnt4);
 					System.out.println("Cnt5:       " + cnt5);
+					System.out.println("Cnt6:       " + cnt6);
+					System.out.println();
 				}
 			}
 			conn.close();

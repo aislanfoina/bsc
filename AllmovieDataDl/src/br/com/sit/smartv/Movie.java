@@ -62,7 +62,7 @@ public class Movie {
 		name = name.replace("?","");
 		name = name.replace("/","");
 		name = name.replace(".","");
-		name = name.replace("-"," ");
+//		name = name.replace("-"," ");
 
 		String nameUrl = name.replace(" ","+");
 
