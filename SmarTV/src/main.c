@@ -44,12 +44,12 @@ int main(void) {
 
 	/* close connection */
 	mysql_free_result(res);
-
-	genProfile(305344, conn);
+/*
+	genProfileAllmovie(ids[2], conn);
 
 	genCluster("profiles_RateCntPer", conn);
+*/
 
-/*
 	char query[1024];
 	sprintf(query, "select distinct customer_id from ratings order by customer_id asc;");
 	if (mysql_query(conn, query)) {
@@ -62,8 +62,8 @@ int main(void) {
 	int numrows = mysql_num_rows(res);
 
 	while ((row = mysql_fetch_row(res)) != NULL) {
- 		genProfile(atoi(row[0]), conn);
- 	}*/
+ 		genProfileAllmovie(atoi(row[0]), conn);
+ 	}
 
 	mysql_close(conn);
 
