@@ -5,6 +5,9 @@
  *      Author: aislan
  */
 
+//#define PROF_DB
+#define CLUSTER
+
 #include "SSACT.h"
 
 int main(void) {
@@ -44,11 +47,12 @@ int main(void) {
 
 	/* close connection */
 	mysql_free_result(res);
-/*
-	genProfileAllmovie(ids[2], conn);
 
-	genCluster("profiles_RateCntPer", conn);
-*/
+#ifndef PROF_DB
+
+	genProfileAllmovie(0, conn);
+
+#else
 
 	char query[1024];
 	sprintf(query, "select distinct customer_id from ratings order by customer_id asc;");
@@ -63,7 +67,15 @@ int main(void) {
 
 	while ((row = mysql_fetch_row(res)) != NULL) {
  		genProfileAllmovie(atoi(row[0]), conn);
+ 		genProfileIMDB(atoi(row[0]), conn);
  	}
+
+#endif
+#ifdef CLUSTER
+
+	genCluster("profiles_RateCntPer", conn);
+
+#endif
 
 	mysql_close(conn);
 

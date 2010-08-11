@@ -10,7 +10,7 @@
 
 #include "ProfileGenerator.h"
 
-int genProfile(int userId, MYSQL *conn) {
+int genProfileIMDB(int userId, MYSQL *conn) {
 	int numgens = NUMBER_OF_GEN;
 
 	MYSQL_RES *res;
@@ -21,8 +21,12 @@ int genProfile(int userId, MYSQL *conn) {
 	/* send SQL query */
 	char query[4098];
 	sprintf(query, "select rating, genre, date from ratings, imdbgenres "
-			"where customer_id = %d and ratings.movie_id = imdbgenres.netflixid "
-			"order by date desc;", id);
+			"where ratings.movie_id = imdbgenres.netflixid");
+	if(userId) {
+		sprintf(query, "%s and customer_id = %d",query,id);
+	}
+	sprintf(query, "%s order by date desc;",query);
+
 	if (mysql_query(conn, query)) {
 		fprintf(stderr, "%s\n", mysql_error(conn));
 		exit(1);
@@ -152,7 +156,7 @@ int genProfile(int userId, MYSQL *conn) {
 			genreName = (char *) malloc(64 * sizeof(char));
 
 			if (translateIdGenre(k, genreName) == -1) {
-				fprintf(stderr, "Impossible to translate Genre ID %s\n", k);
+				fprintf(stderr, "Impossible to translate Genre ID %d\n", k);
 				exit(1);
 			}
 			printf("%s\t", genreName);
@@ -261,15 +265,14 @@ int genProfile(int userId, MYSQL *conn) {
 		/* close connection */
 		mysql_free_result(res);
 
-
+#ifdef SAVE
 /*
  *
  * Data save
  *
  */
-/*
-		saveDataProfile(id, totalCount, totalMean2, totalStd2, conn);
-		saveIntProfile(id, genCounter, "profiles_RateCounter", conn);
+		saveDataProfile(id, totalCount, totalMean2, totalStd2, "profiles_Data_IMDb", conn);
+		saveIntProfile(id, genCounter, "profiles_RateCounter_IMDb", conn);
 
 
 		float genCntPer[numgens];
@@ -279,7 +282,7 @@ int genProfile(int userId, MYSQL *conn) {
 			genCntPer[k] = (float)genCounter[k]/(float)totalCount;
 		}
 
-		saveFloatProfile(id, genCntPer, "profiles_RateCntPer", conn);
+		saveFloatProfile(id, genCntPer, "profiles_RateCntPer_IMDb", conn);
 
 		float genNormal[numgens];
 		memset(genNormal, 0, numgens * sizeof(float));
@@ -290,9 +293,10 @@ int genProfile(int userId, MYSQL *conn) {
 			}
 		}
 
-		saveFloatProfile(id, genNormal, "profiles_RateNormal", conn);
-*/
+		saveFloatProfile(id, genNormal, "profiles_RateNormal_IMDb", conn);
+#endif
 	}
+	return 0;
 }
 
 
@@ -307,8 +311,12 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
 	/* send SQL query */
 	char query[4098];
 	sprintf(query, "select rating, genre, date from ratings, allmoviegenres "
-			"where customer_id = %d and ratings.movie_id = allmoviegenres.netflixid "
-			"order by date desc;", id);
+			"where ratings.movie_id = allmoviegenres.netflixid");
+	if(userId) {
+		sprintf(query, "%s and customer_id = %d",query,id);
+	}
+	sprintf(query, "%s order by date desc;",query);
+
 	if (mysql_query(conn, query)) {
 		fprintf(stderr, "%s\n", mysql_error(conn));
 		exit(1);
@@ -438,7 +446,7 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
 			genreName = (char *) malloc(64 * sizeof(char));
 
 			if (translateIdGenre(k, genreName) == -1) {
-				fprintf(stderr, "Impossible to translate Genre ID %s\n", k);
+				fprintf(stderr, "Impossible to translate Genre ID %d\n", k);
 				exit(1);
 			}
 			printf("%s\t", genreName);
@@ -547,6 +555,7 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
 		/* close connection */
 		mysql_free_result(res);
 
+#ifdef SAVE
 
 /*
  *
@@ -554,8 +563,8 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
  *
  */
 
-		saveDataProfile(id, totalCount, totalMean2, totalStd2, conn);
-		saveIntProfile(id, genCounter, "profiles_RateCounter", conn);
+		saveDataProfile(id, totalCount, totalMean2, totalStd2, "profiles_Data_Allmovie", conn);
+		saveIntProfile(id, genCounter, "profiles_RateCounter_Allmovie", conn);
 
 
 		float genCntPer[numgens];
@@ -565,7 +574,7 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
 			genCntPer[k] = (float)genCounter[k]/(float)totalCount;
 		}
 
-		saveFloatProfile(id, genCntPer, "profiles_RateCntPer", conn);
+		saveFloatProfile(id, genCntPer, "profiles_RateCntPer_Allmovie", conn);
 
 		float genNormal[numgens];
 		memset(genNormal, 0, numgens * sizeof(float));
@@ -576,14 +585,17 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
 			}
 		}
 
-		saveFloatProfile(id, genNormal, "profiles_RateNormal", conn);
+		saveFloatProfile(id, genNormal, "profiles_RateNormal_Allmovie", conn);
+
+#endif
 
 	}
+	return 0;
 }
 
 int saveFloatProfile(int userId, float *profile, char *table, MYSQL *conn) {
 	MYSQL_RES *res;
-	MYSQL_ROW row;
+//	MYSQL_ROW row;
 
 	char query[4098];
 
@@ -611,7 +623,7 @@ int saveFloatProfile(int userId, float *profile, char *table, MYSQL *conn) {
 
 int saveIntProfile(int userId, int *profile, char *table, MYSQL *conn) {
 	MYSQL_RES *res;
-	MYSQL_ROW row;
+//	MYSQL_ROW row;
 
 	char query[4098];
 
@@ -637,9 +649,9 @@ int saveIntProfile(int userId, int *profile, char *table, MYSQL *conn) {
 	return 0;
 }
 
-int saveDataProfile(int userId, int totalRates, float meanRate, float stdRate, MYSQL *conn) {
+int saveDataProfile(int userId, int totalRates, float meanRate, float stdRate, char *table, MYSQL *conn) {
 	MYSQL_RES *res;
-	MYSQL_ROW row;
+//	MYSQL_ROW row;
 
 	char query[4098];
 

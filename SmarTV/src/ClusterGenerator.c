@@ -1,6 +1,6 @@
 /*
  ============================================================================
- Name        : ProfileGenerator.c
+ Name        : ClusterGenerator.c
  Author      : Aislan G. Foina
  Version     :
  Copyright   : Your copyright notice
