@@ -29,8 +29,8 @@ int genProfile(int userId, char *movieDb, MYSQL *conn);
 int genProfileIMDB(int userId, MYSQL *conn);
 int genProfileAllmovie(int userId, MYSQL *conn);
 
-int saveIntProfile(int userId, int *profile, char *table, MYSQL *conn);
-int saveFloatProfile(int userId, float *profile, char *table, MYSQL *conn);
-int saveDataProfile(int userId, int totalRates, float meanRate, float stdRate, char *table, MYSQL *conn);
+int saveIntProfile(int userId, int *profile, char *table, char *moviedb, MYSQL *conn);
+int saveFloatProfile(int userId, float *profile, char *table, char *moviedb, MYSQL *conn);
+int saveDataProfile(int userId, int totalRates, float meanRate, float stdRate, char *table, char *moviedb, MYSQL *conn);
 
 #endif /* PROFILEGENERATOR_H_ */
