@@ -8,7 +8,7 @@
 #ifndef PROFILEGENERATOR_H_
 #define PROFILEGENERATOR_H_
 
-//#define SAVE
+#define SAVE
 
 #define MAX_ROW_CNT 100000
 

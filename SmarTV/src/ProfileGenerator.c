@@ -44,27 +44,27 @@ int genProfile(int userId, char *movieDb, MYSQL *conn) {
 
 		float totalMean = 0;
 		float totalStd = 0;
-		int totalCount = 0;
+		unsigned int totalCount = 0;
 
-		int genCounter[numgens];
+		unsigned int genCounter[numgens];
 		memset(genCounter, 0, numgens * sizeof(int));
 
-		int gen5Counter[numgens];
+		unsigned int gen5Counter[numgens];
 		memset(gen5Counter, 0, numgens * sizeof(int));
-		int gen4Counter[numgens];
+		unsigned int gen4Counter[numgens];
 		memset(gen4Counter, 0, numgens * sizeof(int));
-		int gen3Counter[numgens];
+		unsigned int gen3Counter[numgens];
 		memset(gen3Counter, 0, numgens * sizeof(int));
-		int gen2Counter[numgens];
+		unsigned int gen2Counter[numgens];
 		memset(gen2Counter, 0, numgens * sizeof(int));
-		int gen1Counter[numgens];
+		unsigned int gen1Counter[numgens];
 		memset(gen1Counter, 0, numgens * sizeof(int));
 
-		int genPosCounter[numgens];
+		unsigned int genPosCounter[numgens];
 		memset(genPosCounter, 0, numgens * sizeof(int));
-		int genMidCounter[numgens];
+		unsigned int genMidCounter[numgens];
 		memset(genMidCounter, 0, numgens * sizeof(int));
-		int genNegCounter[numgens];
+		unsigned int genNegCounter[numgens];
 		memset(genNegCounter, 0, numgens * sizeof(int));
 
 		float genRate[numgens];
