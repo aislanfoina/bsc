@@ -6,7 +6,7 @@
  */
 
 //#define PROF_DB
-#define CLUSTER
+//#define CLUSTER
 
 #include "SSACT.h"
 
@@ -50,7 +50,8 @@ int main(void) {
 
 #ifndef PROF_DB
 
-	genProfileAllmovie(0, conn);
+	genProfile(0, "Allmovie", conn);
+//	genProfile(0, "IMDb", conn);
 
 #else
 

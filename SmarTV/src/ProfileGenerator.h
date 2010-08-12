@@ -10,6 +10,8 @@
 
 //#define SAVE
 
+#define MAX_ROW_CNT 100000
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +25,7 @@ int translateGenreId(char *genreName);
 int translateIdGenre(int genreId, char *genreName);
 int translateGenreIdAllmovie(char *genreName);
 
+int genProfile(int userId, char *movieDb, MYSQL *conn);
 int genProfileIMDB(int userId, MYSQL *conn);
 int genProfileAllmovie(int userId, MYSQL *conn);
 

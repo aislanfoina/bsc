@@ -10,6 +10,350 @@
 
 #include "ProfileGenerator.h"
 
+
+int genProfile(int userId, char *movieDb, MYSQL *conn) {
+	int numgens = NUMBER_OF_GEN;
+
+	MYSQL_RES *res;
+	MYSQL_ROW row;
+
+	int id = userId;
+
+	/* Count the records */
+
+	char query[4098];
+	sprintf(query, "select count(*) from ratings");
+	if(userId) {
+		sprintf(query, "%s where customer_id = %d",query,id);
+	}
+
+	if (mysql_query(conn, query)) {
+		fprintf(stderr, "%s\n", mysql_error(conn));
+		exit(1);
+	}
+
+	res = mysql_store_result(conn);
+
+	row = mysql_fetch_row(res);
+
+	int recCounter = atoi(row[0]);
+
+	printf("%d ratings returned for the user [%d]:\n", recCounter, id);
+
+	if (recCounter > 20) {
+
+		float totalMean = 0;
+		float totalStd = 0;
+		int totalCount = 0;
+
+		int genCounter[numgens];
+		memset(genCounter, 0, numgens * sizeof(int));
+
+		int gen5Counter[numgens];
+		memset(gen5Counter, 0, numgens * sizeof(int));
+		int gen4Counter[numgens];
+		memset(gen4Counter, 0, numgens * sizeof(int));
+		int gen3Counter[numgens];
+		memset(gen3Counter, 0, numgens * sizeof(int));
+		int gen2Counter[numgens];
+		memset(gen2Counter, 0, numgens * sizeof(int));
+		int gen1Counter[numgens];
+		memset(gen1Counter, 0, numgens * sizeof(int));
+
+		int genPosCounter[numgens];
+		memset(genPosCounter, 0, numgens * sizeof(int));
+		int genMidCounter[numgens];
+		memset(genMidCounter, 0, numgens * sizeof(int));
+		int genNegCounter[numgens];
+		memset(genNegCounter, 0, numgens * sizeof(int));
+
+		float genRate[numgens];
+		memset(genRate, 0, numgens * sizeof(float));
+		float genPosRate[numgens];
+		memset(genPosRate, 0, numgens * sizeof(float));
+		float genNegRate[numgens];
+		memset(genNegRate, 0, numgens * sizeof(float));
+		float genMidRate[numgens];
+		memset(genMidRate, 0, numgens * sizeof(float));
+
+		float genMean[numgens];
+		memset(genMean, 0, numgens * sizeof(float));
+		float genStd[numgens];
+		memset(genStd, 0, numgens * sizeof(float));
+
+		int numrows = MAX_ROW_CNT;
+		int k;
+
+		for (k = 0; numrows >= MAX_ROW_CNT; k++) {
+
+			if(!strcmp(movieDb,"IMDb")) {
+
+				/* send SQL query */
+				sprintf(query, "select rating, genre, date from ratings, imdbgenres "
+						"where ratings.movie_id = imdbgenres.netflixid");
+				if(userId) {
+					sprintf(query, "%s and customer_id = %d",query,id);
+				}
+				sprintf(query, "%s order by date desc limit %d,%d;",query,k*MAX_ROW_CNT,MAX_ROW_CNT);
+
+			}
+			else if(!strcmp(movieDb,"Allmovie")) {
+
+				/* send SQL query */
+				sprintf(query, "select rating, genre, date from ratings, allmoviegenres "
+						"where ratings.movie_id = allmoviegenres.netflixid");
+				if(userId) {
+					sprintf(query, "%s and customer_id = %d",query,id);
+				}
+				sprintf(query, "%s order by date desc limit %d,%d;",query,k*MAX_ROW_CNT,MAX_ROW_CNT);
+
+			}
+			if (mysql_query(conn, query)) {
+				fprintf(stderr, "%s\n", mysql_error(conn));
+				exit(1);
+			}
+
+			mysql_free_result(res);
+			res = mysql_store_result(conn);
+
+			numrows = mysql_num_rows(res);
+
+			while ((row = mysql_fetch_row(res)) != NULL) {
+				int origrate = atoi(row[0]);
+				float rate = (float) (origrate - 3) / (float) 2;
+
+				int genId = -1;
+
+				if(!strcmp(movieDb,"IMDb")) {
+					genId = translateGenreId(row[1]);
+				}
+				else if(!strcmp(movieDb,"Allmovie")) {
+					genId = translateGenreIdAllmovie(row[1]);
+				}
+
+				if (genId < 0) {
+	//				fprintf(stderr, "Impossible to translate Genre Name %s\n",
+	//						row[1]);
+				}
+				else {
+
+					switch (origrate) {
+					case 5:
+						gen5Counter[genId]++;
+						break;
+					case 4:
+						gen4Counter[genId]++;
+						break;
+					case 3:
+						gen3Counter[genId]++;
+						break;
+					case 2:
+						gen2Counter[genId]++;
+						break;
+					case 1:
+						gen1Counter[genId]++;
+						break;
+					}
+
+					if (rate > 0) {
+						genPosCounter[genId]++;
+						genPosRate[genId] += rate;
+					} else if (rate < 0) {
+						genNegCounter[genId]++;
+						genNegRate[genId] += rate;
+					} else {
+						genMidCounter[genId]++;
+						genMidRate[genId] += rate;
+					}
+
+					genCounter[genId]++;
+					genRate[genId] += rate;
+					genStd[genId] += rate * rate;
+
+					totalCount++;
+					totalMean += rate;
+					totalStd += rate * rate;
+				}
+			}
+			printf("%d ratings processed for the user [%d]:\n", totalCount, id);
+		}
+
+		for (k = 0; k < numgens; k++) {
+			if (genCounter[k] != 0) {
+				genMean[k] = (float) genRate[k] / (float) genCounter[k];
+				genStd[k] = sqrt((genStd[k] / (float) genCounter[k])
+						- (genMean[k] * genMean[k]));
+			}
+		}
+		float totalMean2 = 0;
+		float totalStd2 = 0;
+		for (k = 0; k < numgens; k++) {
+			totalMean2 += genMean[k];
+			totalStd2 += genMean[k]*genMean[k];
+		}
+		totalMean2 = totalMean2/numgens;
+		totalStd2 = sqrt((totalStd2 / numgens) - (totalMean2 * totalMean2));
+
+		totalMean = totalMean / (float) totalCount;
+		totalStd = sqrt((totalStd / totalCount) - (totalMean * totalMean));
+
+		printf("Genres: \t");
+		for (k = 0; k < numgens; k++) {
+			char *genreName;
+			genreName = (char *) malloc(64 * sizeof(char));
+
+			if (translateIdGenre(k, genreName) == -1) {
+				fprintf(stderr, "Impossible to translate Genre ID %d\n", k);
+				exit(1);
+			}
+			printf("%s\t", genreName);
+		}
+		printf("\nRateCounter: \t");
+		for (k = 0; k < numgens; k++)
+			printf("%d\t", genCounter[k]);
+
+		printf("\nRatePosCounter: \t");
+		for (k = 0; k < numgens; k++)
+			printf("%d\t", genPosCounter[k]);
+
+		printf("\nRateNegCounter: \t");
+		for (k = 0; k < numgens; k++)
+			printf("%d\t", genNegCounter[k]);
+
+		printf("\nRateMidCounter: \t");
+		for (k = 0; k < numgens; k++)
+			printf("%d\t", genMidCounter[k]);
+
+		printf("\nDon't Care: \t");
+		for (k = 0; k < numgens; k++) {
+			float dont_care = (float) genPosCounter[k]
+					/ (float) genNegCounter[k];
+			if (dont_care > 1)
+				dont_care = (float) 1 / dont_care;
+			if (dont_care > TH_DONT_CARE)
+				printf("* %f\t", dont_care);
+			else
+				printf("%f\t", dont_care);
+		}
+		printf("\nDon't Care2: \t");
+		for (k = 0; k < numgens; k++) {
+			float dont_care = (float) genMidCounter[k]
+					/ (float) (genPosCounter[k] + genNegCounter[k]);
+			if (dont_care > 1)
+				dont_care = (float) 1 / dont_care;
+			if (dont_care > TH_DONT_CARE)
+				printf("* %f\t", dont_care);
+			else
+				printf("%f\t", dont_care);
+		}
+		printf("\nHigh Pos: \t");
+		for (k = 0; k < numgens; k++) {
+			float high_pos = (float) genPosCounter[k]
+					/ (float) (genPosCounter[k] + genMidCounter[k]
+							+ genNegCounter[k]);
+			if (high_pos > TH_HIGH_RATIO)
+				printf("* %f\t", high_pos);
+			else
+				printf("%f\t", high_pos);
+		}
+
+		printf("\nHigh Mid: \t");
+		for (k = 0; k < numgens; k++) {
+			float high_pos = (float) genMidCounter[k]
+					/ (float) (genPosCounter[k] + genMidCounter[k]
+							+ genNegCounter[k]);
+			if (high_pos > TH_HIGH_RATIO)
+				printf("* %f\t", high_pos);
+			else
+				printf("%f\t", high_pos);
+		}
+
+		printf("\nHigh Neg: \t");
+		for (k = 0; k < numgens; k++) {
+			float high_neg = (float) genNegCounter[k]
+					/ (float) (genPosCounter[k] + genMidCounter[k]
+							+ genNegCounter[k]);
+			if (high_neg > TH_HIGH_RATIO)
+				printf("* %f\t", high_neg);
+			else
+				printf("%f\t", high_neg);
+		}
+
+		printf("\nRatePosMinusNegCounter: \t");
+		for (k = 0; k < numgens; k++)
+			printf("%d\t", genPosCounter[k] - genNegCounter[k]);
+
+		printf("\nMeanRate: \t");
+		for (k = 0; k < numgens; k++)
+			printf("%f\t", genMean[k]);
+
+		printf("\nSTDRate: \t");
+		for (k = 0; k < numgens; k++)
+			printf("%f\t", genStd[k]);
+
+		printf("\nNormalizedRate: \t");
+		for (k = 0; k < numgens; k++)
+			printf("%f\t", (genMean[k] - totalMean) / totalStd);
+
+		printf("\nNormalizedRate2: \t");
+		for (k = 0; k < numgens; k++)
+			printf("%f\t", (genMean[k] - totalMean2) / totalStd2);
+
+		printf("\n\n");
+
+		printf("TotalCount: \t %d\n", totalCount);
+		printf("TotalMean: \t %f\n", totalMean);
+		printf("TotalStd: \t %f\n", totalStd);
+
+		printf("TotalMean2: \t %f\n", totalMean2);
+		printf("TotalStd2: \t %f\n", totalStd2);
+
+		printf("\nEnd of user %d processing\n\n\n", id);
+		/* close connection */
+		mysql_free_result(res);
+
+#ifdef SAVE
+
+/*
+ *
+ * Data save
+ *
+ */
+
+		saveDataProfile(id, totalCount, totalMean2, totalStd2, strcat("profiles_Data_",movieDb), conn);
+		saveIntProfile(id, genCounter, strcat("profiles_RateCounter_",movieDb), conn);
+
+
+		float genCntPer[numgens];
+		memset(genCntPer, 0, numgens * sizeof(float));
+
+		for(k=0; k < numgens; k++) {
+			genCntPer[k] = (float)genCounter[k]/(float)totalCount;
+		}
+
+		saveFloatProfile(id, genCntPer, strcat("profiles_RateCntPer_",movieDb), conn);
+
+		float genNormal[numgens];
+		memset(genNormal, 0, numgens * sizeof(float));
+
+		if(!isnan(totalStd2) && totalStd2 != 0) {
+			for(k=0; k < numgens; k++) {
+				genNormal[k] = (float)(genMean[k] - totalMean2) / (float)totalStd2;
+			}
+		}
+
+		saveFloatProfile(id, genNormal, strcat("profiles_RateNormal_",movieDb), conn);
+
+#endif
+
+	}
+	return 0;
+}
+
+
+
+#ifdef null
+
 int genProfileIMDB(int userId, MYSQL *conn) {
 	int numgens = NUMBER_OF_GEN;
 
@@ -308,14 +652,13 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
 
 	int id = userId;
 
-	/* send SQL query */
+	/* Count the records */
+
 	char query[4098];
-	sprintf(query, "select rating, genre, date from ratings, allmoviegenres "
-			"where ratings.movie_id = allmoviegenres.netflixid");
+	sprintf(query, "select count(*) from ratings");
 	if(userId) {
-		sprintf(query, "%s and customer_id = %d",query,id);
+		sprintf(query, "%s where customer_id = %d",query,id);
 	}
-	sprintf(query, "%s order by date desc;",query);
 
 	if (mysql_query(conn, query)) {
 		fprintf(stderr, "%s\n", mysql_error(conn));
@@ -324,11 +667,13 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
 
 	res = mysql_store_result(conn);
 
-	int numrows = mysql_num_rows(res);
+	row = mysql_fetch_row(res);
 
-	if (numrows > 20) {
-		/* output table name */
-		printf("%d ratings returned for the user [%d]:\n", numrows, id);
+	int recCounter = atoi(row[0]);
+
+	printf("%d ratings returned for the user [%d]:\n", recCounter, id);
+
+	if (recCounter > 20) {
 
 		float totalMean = 0;
 		float totalStd = 0;
@@ -369,57 +714,79 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
 		float genStd[numgens];
 		memset(genStd, 0, numgens * sizeof(float));
 
-		while ((row = mysql_fetch_row(res)) != NULL) {
-			int origrate = atoi(row[0]);
-			float rate = (float) (origrate - 3) / (float) 2;
+		int numrows = MAX_ROW_CNT;
+		int k;
 
-			int genId = translateGenreIdAllmovie(row[1]);
+		for (k = 0; numrows >= MAX_ROW_CNT; k++) {
 
-			if (genId < 0) {
-//				fprintf(stderr, "Impossible to translate Genre Name %s\n",
-//						row[1]);
+			/* send SQL query */
+			sprintf(query, "select rating, genre, date from ratings, allmoviegenres "
+					"where ratings.movie_id = allmoviegenres.netflixid");
+			if(userId) {
+				sprintf(query, "%s and customer_id = %d",query,id);
 			}
-			else {
+			sprintf(query, "%s order by date desc limit %d,%d;",query,k,MAX_ROW_CNT);
 
-				switch (origrate) {
-				case 5:
-					gen5Counter[genId]++;
-					break;
-				case 4:
-					gen4Counter[genId]++;
-					break;
-				case 3:
-					gen3Counter[genId]++;
-					break;
-				case 2:
-					gen2Counter[genId]++;
-					break;
-				case 1:
-					gen1Counter[genId]++;
-					break;
+			if (mysql_query(conn, query)) {
+				fprintf(stderr, "%s\n", mysql_error(conn));
+				exit(1);
+			}
+
+			res = mysql_store_result(conn);
+
+//			int numrows = mysql_num_rows(res);
+
+			while ((row = mysql_fetch_row(res)) != NULL) {
+				int origrate = atoi(row[0]);
+				float rate = (float) (origrate - 3) / (float) 2;
+
+				int genId = translateGenreIdAllmovie(row[1]);
+
+				if (genId < 0) {
+	//				fprintf(stderr, "Impossible to translate Genre Name %s\n",
+	//						row[1]);
 				}
+				else {
 
-				if (rate > 0) {
-					genPosCounter[genId]++;
-					genPosRate[genId] += rate;
-				} else if (rate < 0) {
-					genNegCounter[genId]++;
-					genNegRate[genId] += rate;
-				} else {
-					genMidCounter[genId]++;
-					genMidRate[genId] += rate;
+					switch (origrate) {
+					case 5:
+						gen5Counter[genId]++;
+						break;
+					case 4:
+						gen4Counter[genId]++;
+						break;
+					case 3:
+						gen3Counter[genId]++;
+						break;
+					case 2:
+						gen2Counter[genId]++;
+						break;
+					case 1:
+						gen1Counter[genId]++;
+						break;
+					}
+
+					if (rate > 0) {
+						genPosCounter[genId]++;
+						genPosRate[genId] += rate;
+					} else if (rate < 0) {
+						genNegCounter[genId]++;
+						genNegRate[genId] += rate;
+					} else {
+						genMidCounter[genId]++;
+						genMidRate[genId] += rate;
+					}
+
+					genCounter[genId]++;
+					genRate[genId] += rate;
+					genStd[genId] += rate * rate;
+
+					totalCount++;
+					totalMean += rate;
+					totalStd += rate * rate;
 				}
-
-				genCounter[genId]++;
-				genRate[genId] += rate;
-				genStd[genId] += rate * rate;
-
-				totalCount++;
-				totalMean += rate;
-				totalStd += rate * rate;
 			}
 		}
-		int k;
 
 		for (k = 0; k < numgens; k++) {
 			if (genCounter[k] != 0) {
@@ -592,6 +959,7 @@ int genProfileAllmovie(int userId, MYSQL *conn) {
 	}
 	return 0;
 }
+#endif
 
 int saveFloatProfile(int userId, float *profile, char *table, MYSQL *conn) {
 	MYSQL_RES *res;
