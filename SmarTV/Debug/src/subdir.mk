@@ -5,17 +5,23 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
 ../src/ClusterGenerator.c \
+../src/ProfileAnalyses.c \
 ../src/ProfileGenerator.c \
+../src/SystemMaintence.c \
 ../src/main.c 
 
 OBJS += \
 ./src/ClusterGenerator.o \
+./src/ProfileAnalyses.o \
 ./src/ProfileGenerator.o \
+./src/SystemMaintence.o \
 ./src/main.o 
 
 C_DEPS += \
 ./src/ClusterGenerator.d \
+./src/ProfileAnalyses.d \
 ./src/ProfileGenerator.d \
+./src/SystemMaintence.d \
 ./src/main.d 
 
 

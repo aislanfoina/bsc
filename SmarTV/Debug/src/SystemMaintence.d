@@ -1,12 +1,12 @@
-src/ProfileGenerator.d src/ProfileGenerator.o: ../src/ProfileGenerator.c \
- ../src/ProfileGenerator.h /usr/include/mysql/mysql.h \
+src/SystemMaintence.d src/SystemMaintence.o: ../src/SystemMaintence.c \
+ ../src/SystemMaintence.h /usr/include/mysql/mysql.h \
  /usr/include/mysql/mysql_version.h /usr/include/mysql/mysql_com.h \
  /usr/include/mysql/mysql_time.h /usr/include/mysql/my_list.h \
  /usr/include/mysql/typelib.h /usr/include/mysql/my_alloc.h \
- ../src/constants.h ../src/SSACT.h ../src/ProfileAnalyses.h \
- ../src/ClusterGenerator.h ../src/SystemMaintence.h
+ ../src/ProfileGenerator.h ../src/constants.h ../src/SSACT.h \
+ ../src/ProfileAnalyses.h ../src/ClusterGenerator.h
 
-../src/ProfileGenerator.h:
+../src/SystemMaintence.h:
 
 /usr/include/mysql/mysql.h:
 
@@ -22,6 +22,8 @@ src/ProfileGenerator.d src/ProfileGenerator.o: ../src/ProfileGenerator.c \
 
 /usr/include/mysql/my_alloc.h:
 
+../src/ProfileGenerator.h:
+
 ../src/constants.h:
 
 ../src/SSACT.h:
@@ -29,5 +31,3 @@ src/ProfileGenerator.d src/ProfileGenerator.o: ../src/ProfileGenerator.c \
 ../src/ProfileAnalyses.h:
 
 ../src/ClusterGenerator.h:
-
-../src/SystemMaintence.h:

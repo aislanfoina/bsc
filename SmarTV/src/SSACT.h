@@ -16,7 +16,12 @@
 
 #include "constants.h"
 #include "ProfileGenerator.h"
+#include "ProfileAnalyses.h"
 #include "ClusterGenerator.h"
+#include "SystemMaintence.h"
 
-
+typedef struct {
+	int id;
+	float genres[NUMBER_OF_GEN];
+} profile_t;
 #endif /* SSACT_H_ */

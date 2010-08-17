@@ -19,7 +19,7 @@
 #include <mysql.h>
 
 #include "constants.h"
-
+#include "SSACT.h"
 
 int translateGenreId(char *genreName);
 int translateIdGenre(int genreId, char *genreName);

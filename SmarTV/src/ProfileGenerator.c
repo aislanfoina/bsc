@@ -10,7 +10,6 @@
 
 #include "ProfileGenerator.h"
 
-
 int genProfile(int userId, char *movieDb, MYSQL *conn) {
 	int numgens = NUMBER_OF_GEN;
 
@@ -356,10 +355,10 @@ int saveFloatProfile(int userId, float *profile, char *table, char *moviedb, MYS
 
 	char query[4098];
 
-	sprintf(query,"insert into %s values (%d,"
+	sprintf(query,"insert into %s_%s values (%d,"
 			"%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,"
 			"%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,"
-			"%f,%f,%f,%f,%f,%f,%f,%f);",table,userId,
+			"%f,%f,%f,%f,%f,%f,%f,%f);",table, moviedb,userId,
 			profile[0],profile[1],profile[2],profile[3],profile[4],
 			profile[5],profile[6],profile[7],profile[8],profile[9],
 			profile[10],profile[11],profile[12],profile[13],profile[14],

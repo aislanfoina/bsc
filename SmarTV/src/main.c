@@ -5,17 +5,16 @@
  *      Author: aislan
  */
 
-//#define PROF_DB
-//#define CLUSTER
-
 #include "SSACT.h"
 
 int main(void) {
+	int run = 1;
+	profile_t *pList;
+	int pListChange;
 
-// 	int ids[] = { 123126, 2118461, 1932594, 2143500, 1977959 };
- 	int ids[] = { 123126, 2118461, 1932594, 2143500, 1977959, 1570292, 2482738, 676682, 307530, 1228542, 1404976, 2311335, 780341};
+	int i;
 
- 	MYSQL *conn;
+	MYSQL *conn;
 	MYSQL_RES *res;
 	MYSQL_ROW row;
 
@@ -32,51 +31,56 @@ int main(void) {
 		exit(1);
 	}
 
-	/* send SQL query */
-	if (mysql_query(conn, "show tables")) {
-		fprintf(stderr, "%s\n", mysql_error(conn));
-		exit(1);
+	while (run) {
+
+		/**
+		 *
+		 * Get id from bluetooth every refresh rate (10 sec)
+		 *
+		 */
+
+		/**
+		 *
+		 * Compare with the actual presence list. If changes, update presence list.
+		 *
+		 */
+
+		// 	int ids[] = { 123126, 2118461, 1932594, 2143500, 1977959 };
+		int ids[] = { 123126, 2118461, 1932594, 2143500, 1977959, 1570292,
+				2482738, 676682, 307530, 1228542, 1404976, 2311335, 780341 };
+
+		int pListLen = sizeof(ids)/sizeof(int);
+		pList = malloc(pListLen * sizeof(profile_t));
+		for(i = 0; i < pListLen; i++) {
+			pList[i].id = ids[i];
+		}
+
+		pListChange = 1;
+
+		if(pListChange) {
+			int i;
+			// get all profiles
+			for (i = 0; i < pListLen; i++) {
+				getProfile(&pList[i],"profiles_RateCntPer","Allmovie", conn);
+			}
+
+			// compare with the medium profile to get the like, dontcare, notlike for each profile
+			profile_t meanProf;
+			meanProf.id = 0;
+			getProfile(&meanProf, "profiles_RateCntPer", "Allmovie", conn);
+
+			for (i = 0; i < pListLen; i++) {
+				subProf(&pList[i], &pList[i], &meanProf);
+			}
+			// combine recommendations
+				// get biggest number of likes and smallest number of notlike (create a score for each genre)
+				// look at the options available and choose the ones with this genre
+
+			// send the recommendations for each one, and for the group
+
+		}
+
 	}
-
-	res = mysql_use_result(conn);
-
-	/* output table name */
-	printf("MySQL Tables in mysql database:\n");
-	while ((row = mysql_fetch_row(res)) != NULL)
-		printf("%s \n", row[0]);
-
-	/* close connection */
-	mysql_free_result(res);
-
-#ifndef PROF_DB
-
-	genProfile(0, "Allmovie", conn);
-//	genProfile(0, "IMDb", conn);
-
-#else
-
-	char query[1024];
-	sprintf(query, "select distinct customer_id from ratings order by customer_id asc;");
-	if (mysql_query(conn, query)) {
-		fprintf(stderr, "%s\n", mysql_error(conn));
-		exit(1);
-	}
-
-	res = mysql_store_result(conn);
-
-	int numrows = mysql_num_rows(res);
-
-	while ((row = mysql_fetch_row(res)) != NULL) {
- 		genProfileAllmovie(atoi(row[0]), conn);
- 		genProfileIMDB(atoi(row[0]), conn);
- 	}
-
-#endif
-#ifdef CLUSTER
-
-	genCluster("profiles_RateCntPer", conn);
-
-#endif
 
 	mysql_close(conn);
 
