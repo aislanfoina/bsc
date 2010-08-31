@@ -194,7 +194,32 @@ int compareELM (const ELM *a, const ELM *b) {
 	}
 }
 
-void simpler_qsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *index) {
+
+
+#pragma css task input (size, offset, depth, buffer[size+depth]) \
+                 output (array[size])
+void init_ELMArray_task(ELM *array, unsigned char *buffer, int size, int depth, int offset) {
+	int i;
+	for(i=0;i < size; i++) {
+		array[i].ngram = readat(buffer, i);
+		array[i].index = i+offset;
+	}
+}
+
+
+#pragma css task input (size, array[size]) \
+                 output (index[size])
+void copy_ELMArray_task(ELM *array, t_int *index, int size) {
+	int i;
+	for(i=0;i < size; i++) {
+		index[i] = array[i].index;
+	}
+}
+
+void simpler_qsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, t_int *index) {
+	int block_records = 500000;
+
+	int chunk_of_records;
 	int NN = numlines - DEPTH + 1;
 	int i;
 
@@ -207,23 +232,35 @@ void simpler_qsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *i
 	word_t *array3;
 	array3 = malloc(NN * sizeof(word_t));*/
 
+	for (i = 0; i < NN; i += block_records) {
+		chunk_of_records = (i + block_records > NN ? NN - i : block_records);
+		init_ELMArray_task(&array[i], &buffer[i], chunk_of_records, DEPTH, i);
+	 }
+/*
 	for (i = 0; i < NN; i++) {
 		array[i].ngram = readat(buffer, i);
 		array[i].index = i;
-/*
+
 		array2[i].ngram = readat(buffer, i);
 		array2[i].index = i;
 
-		array3[i] = array[i].ngram;*/
-	}
+		array3[i] = array[i].ngram;
+	}*/
 
 //	psort(array2, NN);
 //	qsort(array2, NN, sizeof(ELM),compareELM);
-	pngramsort(array, NN);
 
+#pragma css barrier
+
+	pngramsort(array, NN);
+/*
 	for (i = 0; i < NN; i++) {
 		index[i] = array[i].index;
-	}
+	}*/
+	for (i = 0; i < NN; i += block_records) {
+		chunk_of_records = (i + block_records > NN ? NN - i : block_records);
+		copy_ELMArray_task(&array[i], &index[i], chunk_of_records);
+	 }
 
 }
 
