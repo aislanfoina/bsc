@@ -19,11 +19,6 @@ typedef __uint64_t word_t;
 //CG rsort
 #define fr(x,y)for(int x=0;x<y;x++)
 
-typedef struct ELM_t
-{
-	word_t ngram;
-	t_int index;
-} ELM;
 
 
 double maintime_int(int print) {
@@ -162,133 +157,6 @@ void memcpy_task(t_int *dst, t_int *orig, int SIZE, int typeSize){
 	memcpy(dst, orig, SIZE * typeSize);
 }
 
-word_t readat(unsigned char *buf,int poz)
-{
-	int depth=sizeof(word_t);
-	word_t rez=0;
-	int i;
-	for(i = 0; i < depth; i++){rez<<=8;rez|=buf[poz+depth-1-i];}
-	return rez;
-}
-
-int compare_number (const word_t *a, const word_t *b) {
-	if (*a > *b)
-		return 1;
-	else
-		return -1;
-
-	return 0;
-}
-
-int compareELM (const ELM *a, const ELM *b) {
-	if(a->ngram < b->ngram)
-		return -1;
-	else if (a->ngram > b->ngram)
-		return 1;
-	else {
-//		return 0;
-		if(a->index < b->index)
-			return -1;
-		else
-			return 1;
-	}
-}
-
-void simpler_qsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *index) {
-	int NN = numlines - DEPTH + 1;
-	int i;
-
-	ELM *array;
-	array = malloc(NN * sizeof(ELM));
-
-/*	ELM *array2;
-	array2 = malloc(NN * sizeof(ELM));
-
-	word_t *array3;
-	array3 = malloc(NN * sizeof(word_t));*/
-
-	for (i = 0; i < NN; i++) {
-		array[i].ngram = readat(buffer, i);
-		array[i].index = i;
-/*
-		array2[i].ngram = readat(buffer, i);
-		array2[i].index = i;
-
-		array3[i] = array[i].ngram;*/
-	}
-
-//	psort(array2, NN);
-//	qsort(array2, NN, sizeof(ELM),compareELM);
-	pngramsort(array, NN);
-
-	for (i = 0; i < NN; i++) {
-		index[i] = array[i].index;
-	}
-
-}
-
-
-void simpler_rsort4ngrams_orig(unsigned char *buffer, int numlines, int DEPTH, int *index) {
-	int NN = numlines - DEPTH + 1;
-
-	if (NN > 0) {
-		unsigned char *pin = buffer + NN;
-		unsigned char *pout = buffer;
-		typedef int t_int;
-		t_int *inputArray = (t_int*) malloc(NN * sizeof(t_int));
-		t_int *outputArray = (t_int*) malloc(NN * sizeof(t_int));
-		const int RANGE = 256;
-		t_int counters[RANGE];
-		t_int startpos[RANGE];
-
-		int i, j, k;
-
-
-		for(i=0;i < NN; i++)
-			inputArray[i] = i;
-		//radix sort, the input is x, the output rank is ix
-		//counters
-
-
-		for(k=0; k < RANGE; k++)
-			counters[k] = 0;
-
-
-		for(i=0; i < NN; i++)
-			counters[*(buffer + i)]++;
-
-
-		for(j=0; j < DEPTH; j++) {
-			int ofs = j;//low endian
-			t_int sp = 0;
-
-			for(k = 0; k < RANGE; k++) {
-				startpos[k] = sp;
-				sp += counters[k];
-			}
-
-			for(i = 0; i < NN; i++) {
-				unsigned char c = buffer[ofs + inputArray[i]];
-				outputArray[startpos[c]++] = inputArray[i];
-			}
-
-			memcpy(inputArray, outputArray, NN * sizeof(inputArray[0]));
-
-			//update counters
-			if (j < DEPTH - 1) {
-				counters[*pout++]--;
-				counters[*pin++]++;
-			}
-
-		}
-
-		memcpy(index, inputArray, NN * sizeof(inputArray[0]));
-		free(outputArray);
-	} else
-		index = NULL;
-}
-
-
 
 void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *index, int *counter_output, int *startpos_output) {
 	const int RANGE = 256;
@@ -297,8 +165,8 @@ void simpler_rsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, int *i
 	int i, j, k;
 
 //	int big_block_records = 60;
-	int big_block_records = 20000000;
-	int block_records = 500000000;
+	int big_block_records = 2000000;
+	int block_records = 500000;
 	int chunk_of_records = 0;
 
 	if(numlines > big_block_records+DEPTH) {
@@ -468,7 +336,14 @@ unsigned char bufferfile1[MAXBUFSIZ];
 unsigned char bufferfile2[MAXBUFSIZ];
 int numlines1, numlines2;
 
-
+word_t readat(unsigned char *buf,int poz)
+{
+	int depth=sizeof(word_t);
+	word_t rez=0;
+	int i;
+	for(i = 0; i < depth; i++){rez<<=8;rez|=buf[poz+depth-1-i];}
+	return rez;
+}
 /*
 inline word_t readat(const unsigned char *buf, int poz) {
 	return *(word_t *) (buf + poz);
@@ -486,7 +361,7 @@ int main(int argc, char ** argv) {
 	numlines2 = fread(bufferfile2, 1, MAXBUFSIZ, fd2);
 	fclose(fd2);
 
-
+	maintime_int(0);
 
 #pragma css start
 
@@ -498,21 +373,8 @@ int main(int argc, char ** argv) {
 	t_int *counter2 = (t_int*) malloc(256 * sizeof(t_int));
 	t_int *startpos2 = (t_int*) malloc(256 * sizeof(t_int));
 
-	maintime_int(0);
-	printf("Original\n");
-
-	simpler_rsort4ngrams_orig(bufferfile1, numlines1, depth, index1);
-	simpler_rsort4ngrams_orig(bufferfile2, numlines2, depth, index2);
-
-#pragma css barrier
-
-	maintime_int(1);
-	printf("Novo\n");
-
-	simpler_qsort4ngrams(bufferfile1, numlines1, depth, index1);
-	simpler_qsort4ngrams(bufferfile2, numlines2, depth, index2);
-//	simpler_rsort4ngrams(bufferfile1, numlines1, depth, index1, counter1, startpos1);
-//	simpler_rsort4ngrams(bufferfile2, numlines2, depth, index2, counter2, startpos2);
+	simpler_rsort4ngrams(bufferfile1, numlines1, depth, index1, counter1, startpos1);
+	simpler_rsort4ngrams(bufferfile2, numlines2, depth, index2, counter2, startpos2);
 
 #pragma css barrier
 
