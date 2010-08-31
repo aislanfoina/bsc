@@ -9,6 +9,8 @@
 
 #define insidetasks
 
+#define BLOCK_RECORDS 500000
+
 typedef int t_int;
 
 //typedef int word_t;
@@ -216,15 +218,15 @@ void copy_ELMArray_task(ELM *array, t_int *index, int size) {
 	}
 }
 
-void simpler_qsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, t_int *index) {
+void simpler_qsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, t_int *index, ELM *array) {
 	int block_records = 500000;
 
 	int chunk_of_records;
 	int NN = numlines - DEPTH + 1;
 	int i;
 
-	ELM *array;
-	array = malloc(NN * sizeof(ELM));
+//	ELM *array;
+//	array = malloc(NN * sizeof(ELM));
 
 /*	ELM *array2;
 	array2 = malloc(NN * sizeof(ELM));
@@ -506,6 +508,181 @@ unsigned char bufferfile2[MAXBUFSIZ];
 int numlines1, numlines2;
 
 
+int isELMequal (ELM *a, ELM *b) {
+	if(a->ngram == b->ngram && a->index == b->index)
+		return 1;
+	else
+		return 0;
+}
+
+#pragma css task input (size, num_idx) \
+                 output (index[num_idx])
+//void startidx(ELM *array, int size, t_int *index, int num_idx) {
+void startidx(int size, t_int *index, int num_idx) {
+	int i;
+	int num = 0;
+
+	int block_records = BLOCK_RECORDS;
+
+	for (i = 0; i < size; i+= block_records) {
+		index[num] = (t_int) i;
+		num++;
+	}
+//	*num_idx = num;
+}
+
+#pragma css task input (numlines1, numlines2, idx_ar1, idx_ar2, array1[numlines1], array2[numlines2], startVal, endVal) \
+                 output (cnt)
+void compareArray(ELM *array1, int numlines1, t_int idx_ar1, ELM *array2, int numlines2, t_int idx_ar2, word_t startVal, word_t endVal, int *cnt) {
+	int i;
+	int tmp_cnt = 0;
+
+	ELM *tmp1;
+	ELM *tmp2;
+
+	ELM *ar1Last;
+	ELM *ar2Last;
+
+//	int linecnt1 = idx_ar1;
+//	int linecnt2 = idx_ar2;
+
+	tmp1 = &array1[idx_ar1];
+	tmp2 = &array2[idx_ar2];
+
+	ar1Last = &array1[numlines1-1];
+	ar2Last = &array2[numlines2-1];
+
+	while (startVal >= tmp2->ngram) {
+		tmp2++;
+//		linecnt2++;
+//		tmp2 = array2[linecnt2];
+	}
+
+	int stop = 0;
+
+	while (tmp1->ngram <= endVal && !stop) { // && !isELMequal(tmp1, ar1Last) && !isELMequal(tmp2,ar2Last)) {
+		if (tmp1->ngram == tmp2->ngram) {
+//				printf("%d %d\n", index1[linecnt1], index2[linecnt2]);
+			tmp_cnt++;
+			if(!isELMequal(tmp1, ar1Last)) {
+				tmp1++;
+			}
+			else
+				stop = 1;
+			if(!isELMequal(tmp2, ar2Last)) {
+				tmp2++;
+			}
+			else
+				stop = 1;
+		}
+		else if (tmp1->ngram < tmp2->ngram) {
+			if(!isELMequal(tmp1, ar1Last)) {
+				tmp1++;
+			}
+			else
+				stop = 1;
+
+		}
+		else if (tmp1->ngram > tmp2->ngram) {
+			if(!isELMequal(tmp2, ar2Last)) {
+				tmp2++;
+			}
+			else
+				stop = 1;
+		}
+	}
+	*cnt = tmp_cnt;
+	/*
+	while (linecnt1 < numlines1 && linecnt2 < numlines2) {
+		//		fprintf(stderr,"i1=%d i2=%d s1=%0llx s2=%0llx\n",i1,i2,s1,s2);
+		if (str1 == str2) {
+//				printf("%d %d\n", index1[linecnt1], index2[linecnt2]);
+			cnt++;
+			linecnt1++;
+			if (linecnt1 < numlines1)
+				str1 = readat(bufferfile1, index1[linecnt1]);
+			linecnt2++;
+			if (linecnt2 < numlines2)
+				str2 = readat(bufferfile2, index2[linecnt2]);
+		} else if (str1 < str2) {
+			linecnt1++;
+			if (linecnt1 < numlines1)
+				str1 = readat(bufferfile1, index1[linecnt1]);
+		} else if (str2 < str1) {
+			linecnt2++;
+			if (linecnt2 < numlines2)
+				str2 = readat(bufferfile2, index2[linecnt2]);
+		}
+	}
+*/
+}
+
+
+void compare2files(ELM *array1, int numlines1, ELM *array2, int numlines2, int depth) {
+	int block_records = BLOCK_RECORDS;
+
+	numlines1 -= depth-1;
+	numlines2 -= depth-1;
+
+	int chunk_of_records;
+	int i;
+
+	int num_idx1 = ceil((float) numlines1 / (float) block_records);
+	int num_idx2 = ceil((float) numlines2 / (float) block_records);
+
+	t_int *index_ar1 = (t_int *) malloc (num_idx1 * sizeof(t_int));
+	t_int *index_ar2 = (t_int *) malloc (num_idx2 * sizeof(t_int));
+
+	startidx(numlines1, index_ar1, num_idx1);
+	startidx(numlines2, index_ar2, num_idx2);
+
+	int *cnt = malloc (num_idx1 * sizeof(int));
+	memset(cnt, 0, sizeof(cnt));
+
+	int cnt1 = 0, cnt2 = 0;
+
+#pragma css barrier
+
+	for(cnt1 = 0; cnt1 < num_idx1; cnt1++) {
+		ELM *tmp1;
+		tmp1 = &array1[index_ar1[cnt1]];
+
+		ELM *tmp2;
+		tmp2 = &array2[index_ar2[cnt2]];
+
+		while(tmp1->ngram > tmp2->ngram && cnt2 < num_idx2-1) {
+			cnt2++;
+			tmp2 = &array2[index_ar2[cnt2]];
+		}
+		word_t startVal = tmp1->ngram;
+		word_t endVal;
+
+		if (cnt1+1 == num_idx1) {
+			ELM *tmp1plus;
+			tmp1plus = &array1[numlines1-1];
+			endVal = tmp1plus->ngram;
+		}
+		else {
+			ELM *tmp1plus;
+			tmp1plus = &array1[index_ar1[cnt1+1]];
+			endVal = tmp1plus->ngram;
+		}
+
+		if(cnt2-1 < 0) {
+			compareArray(array1,numlines1,index_ar1[cnt1], array2, numlines2, index_ar2[cnt2], startVal, endVal, &cnt[cnt1]);
+		}
+		else {
+			compareArray(array1,numlines1,index_ar1[cnt1], array2, numlines2, index_ar2[cnt2-1], startVal, endVal, &cnt[cnt1]);
+//			compareArray(&array1[index_ar1[cnt1]], &array2[index_ar2[cnt2-1]], startVal, endVal, &cnt[cnt1]);
+		}
+	}
+	int total = 0;
+	for(i = 0; i < cnt1; i++)
+		total += cnt[i];
+	printf("++++ cnt = %d\n",total);
+}
+
+
 /*
 inline word_t readat(const unsigned char *buf, int poz) {
 	return *(word_t *) (buf + poz);
@@ -528,6 +705,10 @@ int main(int argc, char ** argv) {
 #pragma css start
 
 	//index the ngrams
+	ELM *array1 = (ELM *) malloc(numlines1 * sizeof(ELM));
+	ELM *array2 = (ELM *) malloc(numlines1 * sizeof(ELM));
+
+
 	t_int *index1 = (t_int*) malloc(numlines1 * sizeof(t_int));
 	t_int *counter1 = (t_int*) malloc(256 * sizeof(t_int));
 	t_int *startpos1 = (t_int*) malloc(256 * sizeof(t_int));
@@ -546,14 +727,21 @@ int main(int argc, char ** argv) {
 	maintime_int(1);
 	printf("Novo\n");
 
-	simpler_qsort4ngrams(bufferfile1, numlines1, depth, index1);
-	simpler_qsort4ngrams(bufferfile2, numlines2, depth, index2);
+	simpler_qsort4ngrams(bufferfile1, numlines1, depth, index1, array1);
+	simpler_qsort4ngrams(bufferfile2, numlines2, depth, index2, array2);
 //	simpler_rsort4ngrams(bufferfile1, numlines1, depth, index1, counter1, startpos1);
 //	simpler_rsort4ngrams(bufferfile2, numlines2, depth, index2, counter2, startpos2);
 
 #pragma css barrier
 
 	maintime_int(1);
+printf("Comparacao Nova\n");
+
+	compare2files(array1, numlines1, array2, numlines2, depth);
+#pragma css barrier
+
+	maintime_int(1);
+	printf("Comparacao Antiga\n");
 
 	//merge
 	int linecnt1 = 0;
