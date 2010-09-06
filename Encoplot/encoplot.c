@@ -126,6 +126,61 @@ void simpler_qsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, t_int 
 
 }
 
+struct chunk
+{
+        ELM  *low;
+        ELM  *high;
+        int   repr;
+};
+
+void dual_qsort4ngrams(unsigned char *buffer1, unsigned char *buffer2, int numlines1, int numlines2, int DEPTH, ELM *array1, ELM *array2) {
+	int block_records = 500000;
+
+	int chunk_of_records1;
+	int NN1 = numlines1 - DEPTH + 1;
+	int i;
+
+	for (i = 0; i < NN1; i += block_records) {
+		chunk_of_records1 = (i + block_records > NN1 ? NN1 - i : block_records);
+		init_ELMArray_task(&array1[i], &buffer1[i], chunk_of_records1, DEPTH, i);
+	 }
+
+	int chunk_of_records2;
+	int NN2 = numlines2 - DEPTH + 1;
+//	int i;
+
+	for (i = 0; i < NN2; i += block_records) {
+		chunk_of_records2 = (i + block_records > NN2 ? NN2 - i : block_records);
+		init_ELMArray_task(&array2[i], &buffer2[i], chunk_of_records2, DEPTH, i);
+	 }
+
+#pragma css wait on (array1)
+    struct chunk    array_chunk1, tmp_chunk1;
+
+    ELM            *tmp1;
+    tmp1   = valloc(NN1 * sizeof(ELM));
+
+    array_chunk1.low  = array1;
+    array_chunk1.high = array1 + NN1 - 1;
+    tmp_chunk1.low    = tmp1;
+    tmp_chunk1.high   = tmp1 + NN1 - 1;
+
+    smp_qsort(&array_chunk1, &tmp_chunk1, NN1);
+
+#pragma css wait on (array2)
+    struct chunk    array_chunk2, tmp_chunk2;
+
+    ELM            *tmp2;
+    tmp2   = valloc(NN1 * sizeof(ELM));
+
+    array_chunk2.low  = array2;
+    array_chunk2.high = array2 + NN2 - 1;
+    tmp_chunk2.low    = tmp2;
+    tmp_chunk2.high   = tmp2 + NN2 - 1;
+
+    smp_qsort(&array_chunk2, &tmp_chunk2, NN2);
+}
+
 
 void simpler_rsort4ngrams_orig(unsigned char *buffer, int numlines, int DEPTH, int *index) {
 	int NN = numlines - DEPTH + 1;
@@ -218,7 +273,7 @@ void startidx(int size, t_int *index, int num_idx) {
 }
 
 #pragma css task input (numlines1, numlines2, idx_ar1, idx_ar2, array1[numlines1], array2[numlines2], startVal, endVal) \
-                 output (cnt)
+                 inout (cnt) reduction (cnt)
 void compareArray(ELM *array1, int numlines1, t_int idx_ar1, ELM *array2, int numlines2, t_int idx_ar2, word_t startVal, word_t endVal, int *cnt) {
 	int i;
 	int tmp_cnt = 0;
@@ -274,7 +329,9 @@ void compareArray(ELM *array1, int numlines1, t_int idx_ar1, ELM *array2, int nu
 				stop = 1;
 		}
 	}
-	*cnt = tmp_cnt;
+#pragma css mutex lock (cnt)
+	*cnt += tmp_cnt;
+#pragma css mutex unlock (cnt)
 }
 
 
@@ -296,8 +353,9 @@ void compare2files(ELM *array1, int numlines1, ELM *array2, int numlines2, int d
 	startidx(numlines1, index_ar1, num_idx1);
 	startidx(numlines2, index_ar2, num_idx2);
 
-	int *cnt = malloc (num_idx1 * sizeof(int));
-	memset(cnt, 0, sizeof(cnt));
+//	int *cnt = malloc (num_idx1 * sizeof(int));
+//	memset(cnt, 0, sizeof(cnt));
+	int cnt = 0;
 
 	int cnt1 = 0, cnt2 = 0;
 
@@ -329,18 +387,18 @@ void compare2files(ELM *array1, int numlines1, ELM *array2, int numlines2, int d
 		}
 
 		if(cnt2-1 < 0) {
-			compareArray(array1,numlines1,index_ar1[cnt1], array2, numlines2, index_ar2[cnt2], startVal, endVal, &cnt[cnt1]);
+			compareArray(array1,numlines1,index_ar1[cnt1], array2, numlines2, index_ar2[cnt2], startVal, endVal, &cnt);
 		}
 		else {
-			compareArray(array1,numlines1,index_ar1[cnt1], array2, numlines2, index_ar2[cnt2-1], startVal, endVal, &cnt[cnt1]);
+			compareArray(array1,numlines1,index_ar1[cnt1], array2, numlines2, index_ar2[cnt2-1], startVal, endVal, &cnt);
 		}
 	}
 
 #pragma css barrier
 
-	int total = 0;
-	for(i = 0; i < cnt1; i++)
-		total += cnt[i];
+	int total = cnt;
+/*	for(i = 0; i < cnt1; i++)
+		total += cnt[i];*/
 	printf("++++ cnt = %d\n",total);
 }
 
@@ -361,7 +419,7 @@ int main(int argc, char ** argv) {
 
 	//index the ngrams
 	ELM *array1 = (ELM *) malloc(numlines1 * sizeof(ELM));
-	ELM *array2 = (ELM *) malloc(numlines1 * sizeof(ELM));
+	ELM *array2 = (ELM *) malloc(numlines2 * sizeof(ELM));
 
 
 	t_int *index1 = (t_int*) malloc(numlines1 * sizeof(t_int));
@@ -369,9 +427,9 @@ int main(int argc, char ** argv) {
 
 	maintime_int(0);
 	printf("New sort\n");
-
-	simpler_qsort4ngrams(bufferfile1, numlines1, depth, index1, array1);
-	simpler_qsort4ngrams(bufferfile2, numlines2, depth, index2, array2);
+	dual_qsort4ngrams(bufferfile1, bufferfile2, numlines1, numlines2, depth, array1, array2);
+//	simpler_qsort4ngrams(bufferfile1, numlines1, depth, index1, array1);
+//	simpler_qsort4ngrams(bufferfile2, numlines2, depth, index2, array2);
 
 #pragma css barrier
 

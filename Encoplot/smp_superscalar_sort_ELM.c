@@ -118,12 +118,12 @@ typedef struct ELM_t
 /* MERGESIZE must be >= 2 */
 #define KILO 1024
 #ifndef MERGESIZE
-//#define MERGESIZE (256*KILO)
-#define MERGESIZE (4*KILO)
+#define MERGESIZE (256*KILO)
+//#define MERGESIZE (4*KILO)
 #endif
 #ifndef QUICKSIZE
-//#define QUICKSIZE (512*KILO)
-#define QUICKSIZE (8*KILO)
+#define QUICKSIZE (512*KILO)
+//#define QUICKSIZE (8*KILO)
 #endif
 #define INSERTIONSIZE 20
 
@@ -805,6 +805,14 @@ static inline float elapsed_time (struct timeval *start, struct timeval *end)
 {
         return (end->tv_sec - start->tv_sec) + (end->tv_usec - start->tv_usec) * 1.0e-6f;
 }
+
+
+int smp_qsort(struct chunk *arr, struct chunk *tmp, long size) {
+    init_chunk_pool();
+    smpss_sort(arr, tmp, size);
+    return 0;
+}
+
 
 
 int pngramsort (ELM *x, int length) {
