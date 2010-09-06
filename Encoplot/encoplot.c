@@ -188,7 +188,8 @@ void simpler_rsort4ngrams_orig(unsigned char *buffer, int numlines, int DEPTH, i
 }
 
 
-#define MAXBUFSIZ 8000123
+#define MAXBUFSIZ 1000012300
+
 unsigned char bufferfile1[MAXBUFSIZ];
 unsigned char bufferfile2[MAXBUFSIZ];
 int numlines1, numlines2;
