@@ -1,3 +1,4 @@
+#include <numa.h>
 #include <sys/time.h>
 #include "stdio.h"
 #include "stdlib.h"
@@ -7,9 +8,9 @@
 #include <unistd.h>
 #include "math.h"
 
-#define BENCHMARK
+//#define BENCHMARK
 
-#define BLOCK_RECORDS 500000
+#define BLOCK_RECORDS 512*1024
 
 typedef int t_int;
 
@@ -101,7 +102,7 @@ void copy_ELMArray_task(ELM *array, t_int *index, int size) {
 }
 
 void simpler_qsort4ngrams(unsigned char *buffer, int numlines, int DEPTH, t_int *index, ELM *array) {
-	int block_records = 500000;
+	int block_records = BLOCK_RECORDS;
 
 	int chunk_of_records;
 	int NN = numlines - DEPTH + 1;
@@ -134,7 +135,7 @@ struct chunk
 };
 
 void dual_qsort4ngrams(unsigned char *buffer1, unsigned char *buffer2, int numlines1, int numlines2, int DEPTH, ELM *array1, ELM *array2) {
-	int block_records = 500000;
+	int block_records = BLOCK_RECORDS;
 
 	int chunk_of_records1;
 	int NN1 = numlines1 - DEPTH + 1;
@@ -256,7 +257,7 @@ int isELMequal (ELM *a, ELM *b) {
 	else
 		return 0;
 }
-
+/*
 #pragma css task input (size, num_idx) \
                  output (index[num_idx])
 
@@ -270,6 +271,42 @@ void startidx(int size, t_int *index, int num_idx) {
 		index[num] = (t_int) i;
 		num++;
 	}
+}
+*/
+
+#pragma css task input (size, array[size]) \
+                 input (num_idx) \
+		 output (index[num_idx], idx)
+
+void startidx(int size, t_int *index, int num_idx, int *idx, ELM *array) {
+	int i;
+	int num = 0;
+
+	int block_records = BLOCK_RECORDS;
+
+	int equal = 0;
+	for (i = 0; i < size; i+= block_records) {
+		while(equal > 0) {
+			if(i + 1 < size) {
+				if (array[i].ngram != array[i+1].ngram)
+					equal = 0;
+				else
+					i++;
+			}
+			else {
+				if(i == 0)
+					equal = 0;
+				else
+					equal = -1;
+			}
+		}
+		if(equal != -1) {
+			index[num] = (t_int) i;
+			num++;
+			equal = 1;
+		}
+	}
+	*idx = num;
 }
 
 #pragma css task input (numlines1, numlines2, idx_ar1, idx_ar2, array1[numlines1], array2[numlines2], startVal, endVal) \
@@ -350,8 +387,14 @@ void compare2files(ELM *array1, int numlines1, ELM *array2, int numlines2, int d
 	t_int *index_ar1 = (t_int *) malloc (num_idx1 * sizeof(t_int));
 	t_int *index_ar2 = (t_int *) malloc (num_idx2 * sizeof(t_int));
 
-	startidx(numlines1, index_ar1, num_idx1);
-	startidx(numlines2, index_ar2, num_idx2);
+	int idx1 = num_idx1;
+	int idx2 = num_idx2;
+
+	startidx(numlines1, index_ar1, num_idx1, &idx1, array1);
+	startidx(numlines2, index_ar2, num_idx2, &idx2, array2);
+
+//	startidx(numlines1, index_ar1, num_idx1);
+//	startidx(numlines2, index_ar2, num_idx2);
 
 //	int *cnt = malloc (num_idx1 * sizeof(int));
 //	memset(cnt, 0, sizeof(cnt));
@@ -360,6 +403,9 @@ void compare2files(ELM *array1, int numlines1, ELM *array2, int numlines2, int d
 	int cnt1 = 0, cnt2 = 0;
 
 #pragma css barrier
+
+	num_idx1 = idx1;
+	num_idx2 = idx2;
 
 	for(cnt1 = 0; cnt1 < num_idx1; cnt1++) {
 		ELM *tmp1;
