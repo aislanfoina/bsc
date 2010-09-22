@@ -11,6 +11,7 @@
 //#define BENCHMARK
 
 #define BLOCK_RECORDS 512*1024
+#define MAXBUFSIZ 1000012300
 
 typedef int t_int;
 
@@ -243,14 +244,6 @@ void simpler_rsort4ngrams_orig(unsigned char *buffer, int numlines, int DEPTH, i
 		index = NULL;
 }
 
-
-#define MAXBUFSIZ 1000012300
-
-unsigned char bufferfile1[MAXBUFSIZ];
-unsigned char bufferfile2[MAXBUFSIZ];
-int numlines1, numlines2;
-
-
 int isELMequal (ELM *a, ELM *b) {
 	if(a->ngram == b->ngram && a->index == b->index)
 		return 1;
@@ -448,9 +441,48 @@ void compare2files(ELM *array1, int numlines1, ELM *array2, int numlines2, int d
 	printf("++++ cnt = %d\n",total);
 }
 
+
+#pragma css task input(size) \
+				output(var[size])
+void task_memset_elm(ELM *var, int size) {
+	memset(var, 0, size*sizeof(ELM));
+}
+
+
+#pragma css task input(size) \
+				output(var[size])
+void task_memset_char(unsigned char *var, int size) {
+        memset(var, 0, size*sizeof(char));
+}
+
 int main(int argc, char ** argv) {
 	int depth = sizeof(word_t);
 	int cnt = 0;
+
+    unsigned char *bufferfile1;
+    unsigned char *bufferfile2;
+    int numlines1, numlines2;
+
+#pragma css start
+
+    bufferfile1 = malloc(MAXBUFSIZ*sizeof(char));
+    bufferfile2 = malloc(MAXBUFSIZ*sizeof(char));
+
+    int block_records = 1024*4098/sizeof(ELM);
+    int chunk_size;
+    int i;
+
+    for(i = 0; i < MAXBUFSIZ; i+=block_records) {
+            chunk_size = (i + block_records > MAXBUFSIZ ? MAXBUFSIZ - i : block_records);
+            task_memset_char(&bufferfile1[i], chunk_size);
+    }
+    for(i = 0; i < MAXBUFSIZ; i+=block_records) {
+            chunk_size = (i + block_records > MAXBUFSIZ ? MAXBUFSIZ - i : block_records);
+            task_memset_char(&bufferfile2[i], chunk_size);
+    }
+
+#pragma css barrier
+
 
 	FILE *fd1 = fopen(argv[1], "rb");
 	numlines1 = fread(bufferfile1, 1, MAXBUFSIZ, fd1);
@@ -460,9 +492,6 @@ int main(int argc, char ** argv) {
 	fclose(fd2);
 
 
-
-#pragma css start
-
 	//index the ngrams
 	ELM *array1 = (ELM *) malloc(numlines1 * sizeof(ELM));
 	ELM *array2 = (ELM *) malloc(numlines2 * sizeof(ELM));
@@ -470,6 +499,17 @@ int main(int argc, char ** argv) {
 
 	t_int *index1 = (t_int*) malloc(numlines1 * sizeof(t_int));
 	t_int *index2 = (t_int*) malloc(numlines2 * sizeof(t_int));
+
+    for(i = 0; i < numlines1; i+=block_records) {
+            chunk_size = (i + block_records > numlines1 ? numlines1 - i : block_records);
+            task_memset_elm(&array1[i], chunk_size);
+    }
+    for(i = 0; i < numlines2; i+=block_records) {
+            chunk_size = (i + block_records > numlines2 ? numlines2 - i : block_records);
+            task_memset_elm(&array2[i], chunk_size);
+    }
+
+#pragma css barrier
 
 	maintime_int(0);
 	printf("New sort\n");
