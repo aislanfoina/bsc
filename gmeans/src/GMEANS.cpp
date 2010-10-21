@@ -143,8 +143,8 @@ GMEANS::GMEANS(map<string, string> ClusteringParameters) {
 bool GMEANS::Run(const vector<const Point*>& Data, Partition& DataPartition,
 		bool SimpleRun) {
 
-    CriticalValue = 20.0;
-    MaxClusters = 60;
+//    CriticalValue = 20.0;
+//    MaxClusters = 60;
 
 	int NUMBER_OF_RECORDS, DIMENSIONS, CENTERS, NEW_CENTERS;
 	int CSS_NUM_SPUS = 1;
@@ -221,27 +221,12 @@ bool GMEANS::Run(const vector<const Point*>& Data, Partition& DataPartition,
 
 	splitlist = (int *) malloc(MAX_CENTERS * sizeof(int));
 
-	/* Make record data */
-//	if (argc < 5) {
-
-		for (i = 0; i < NUMBER_OF_RECORDS; i++) {
-			Point* InputPoint = (Point *) Data[i];
-			for (j = 0; j < DIMENSIONS; j++) {
-				records[i * DIMENSIONS + j] = (float) (*InputPoint)[j];//rand() / 100000.0f + j;
-			}
+	for (i = 0; i < NUMBER_OF_RECORDS; i++) {
+		Point* InputPoint = (Point *) Data[i];
+		for (j = 0; j < DIMENSIONS; j++) {
+			records[i * DIMENSIONS + j] = (float) (*InputPoint)[j];//rand() / 100000.0f + j;
 		}
-//	}
-	// Or load from a file if a path is passed as parameter
-/*	else if (argc >= 5) {
-		getDataset(argv[4], records, NUMBER_OF_RECORDS, DIMENSIONS);
-		printf("Data loaded from %s\n", argv[4]);
-
-		// In case a Critical Value for A&D is passed as parameter
-		if (argc == 6) {
-			adcv = atoi(argv[5]);
-		}
-
-	}*/
+	}
 
 	adcv = CriticalValue;
 
@@ -362,101 +347,13 @@ bool GMEANS::Run(const vector<const Point*>& Data, Partition& DataPartition,
 
 	printf("\n######### END FINAL REPORT #########\n\n");
 
-#ifdef LOG
-	// Save data into a file
-	FILE *fp;
-
-	fp = fopen("gmeans.log","w");
-	if ( fp == NULL ) {
-		printf("Cannot open gmeans log file\n");
-	}
-	else {
-		fprintf(fp,"Points: \n");
-		for (i = 0; i < NUMBER_OF_RECORDS; i++) {
-			for (j = 0; j < DIMENSIONS; j++) {
-				fprintf(fp, "%f\t",records[i*DIMENSIONS+j]);
-			}
-			fprintf(fp,"\n");
-		}
-		fprintf(fp,"\nCenters: \n");
-		for (i = 0; i < CENTERS; i++) {
-			for (j = 0; j < DIMENSIONS; j++) {
-				fprintf(fp, "%f\t",centers[i*DIMENSIONS+j]);
-			}
-			fprintf(fp,"\n");ResultingClusters
-		}
-	}
-	fclose (fp);
-
-	fp = fopen("gmeans.csv","w");
-	if ( fp == NULL ) {
-		printf("Cannot open gmeans csv file\n");
-	}
-	else {
-		for (i = 0; i < NUMBER_OF_RECORDS; i++) {
-			for (j = 0; j < DIMENSIONS; j++) {
-				fprintf(fp, "%f,",records[i*DIMENSIONS+j]);
-			}
-			fprintf(fp,"%d\n", assigned_centers[i]);
-		}
-	}
-	fclose (fp);
-#endif
-
 	/* Number of resulting clusters must be defined for the partition */
 
 	vector<cluster_id_t>& ClusterAssignmentVector = DataPartition.GetAssignmentVector();
-//	vector<cluster_id_t> ClusterAssignmentVector;
 
 	for(i = 0; i < NUMBER_OF_RECORDS; i++) {
 		ClusterAssignmentVector.push_back(assigned_centers[i]+1);//[i] = UNCLASSIFIED;
 	}
-/*
-	for(i = 0; i < NUMBER_OF_RECORDS; i++) {
-		vector<double> pntgm;
-		for (j = 0; j < DIMENSIONS; j++) {
-			pntgm.push_back(records[i * DIMENSIONS + j]);
-		}
-		Point ptgm(pntgm);
-
-		int k = 0;
-		bool run = true;
-
-		do {
-			if(ClusterAssignmentVector[k] == UNCLASSIFIED) {
-				Point* InputPoint = (Point *) Data[k];
-				vector<double> pntlib;
-
-				for (j = 0; j < DIMENSIONS; j++) {
-					pntlib.push_back((float) (*InputPoint)[j]);
-				}
-				Point ptlib(pntlib);
-				double diff = ptgm.EuclideanDistance(ptlib);
-				if(diff < 0.0001) {
-					run = false;
-//					printf("Found! i = %d k = %d\n",i,k);
-//					ptgm.PrintPoint();
-//					ptlib.PrintPoint();
-				}
-				else if (k < NUMBER_OF_RECORDS-1) {
-					k++;
-				}
-				else {
-					printf("Error! Point not found! i = %d\n",i);
-					run = false;
-				}
-			}
-			else if (k < NUMBER_OF_RECORDS-1) {
-				k++;
-			}
-			else {
-				printf("Error! Point not found! i = %d\n",i);
-				run = false;
-			}
-		} while(run);
-		ClusterAssignmentVector[k] = assigned_centers[i];
-	}
-*/
 	DataPartition.SetNumberOfClusters (CENTERS);
 
 	free(centers);
