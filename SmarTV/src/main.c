@@ -45,8 +45,8 @@ int main(void) {
 		 *
 		 */
 
-		// 	int ids[] = { 123126, 2118461, 1932594, 2143500, 1977959 };
-		int ids[] = { 123126, 2118461, 1932594, 2143500, 1977959, 1570292,
+//		int ids[] = { 123120, 2118461, 1932594, 2143500, 1977959 };
+		int ids[] = { 123120, 2118461, 1932594, 2143500, 1977959, 1570292,
 				2482738, 676682, 307530, 1228542, 1404976, 2311335, 780341 };
 
 		int pListLen = sizeof(ids)/sizeof(int);
@@ -61,8 +61,22 @@ int main(void) {
 			int i;
 			// get all profiles
 			for (i = 0; i < pListLen; i++) {
-				getProfile(&pList[i],"profiles_RateCntPer","Allmovie", conn);
+				getProfile(&pList[i], "profiles_RateCntPer", "Allmovie", conn);
 			}
+			// colaborative recommendations
+
+			float *rate = malloc(sizeof(float));
+
+			int movieId = 1;
+
+			for (i = 0; i < pListLen; i++) {
+				getRate(&pList[i], movieId, rate, "Allmovie", conn);
+				printf(" Rate for movie %d and user %d[%d] is %f\n", movieId, pList[i].id, pList[i].cluster, *rate);
+			}
+			printf("\n\n");
+
+
+			// content based recommendations
 
 			// compare with the medium profile to get the like, dontcare, notlike for each profile
 			profile_t meanProf;

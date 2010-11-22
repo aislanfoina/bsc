@@ -23,5 +23,7 @@
 typedef struct {
 	int id;
 	float genres[NUMBER_OF_GEN];
+	int cluster;
 } profile_t;
+
 #endif /* SSACT_H_ */

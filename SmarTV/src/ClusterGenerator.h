@@ -15,6 +15,7 @@
 #include <mysql.h>
 
 #include "constants.h"
+#include "csv_parser.h"
 
 int genCluster(char *table, MYSQL *conn);
 int saveProfile(float *profile, int userId, FILE *fp);
