@@ -1,0 +1,13 @@
+
+--------------------------------------------
+Summary of timings
+Setup Data (secs)          : 0.00139308
+Read Data (secs)           : 0.0904319
+Ranging Data (secs)        : 0.0705681
+Transforming Data (secs)   : 0.021121
+Sorting Data (secs)        : 0.113055
+Coloring Sub-Data (secs)   : 0.0207269
+Rendering Sub-Data (secs)  : 0.208285
+Write Data (secs)          : 0.00529194
+Total (secs)               : 0.530987
+
