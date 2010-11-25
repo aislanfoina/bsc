@@ -130,7 +130,7 @@ int saveCluster (char *table, MYSQL *conn) {
 			printf("%d of %d (%f%%) profiles processed...\n", k, numrows, ((float)k/(float)numrows)*100);
 
 		res2 = mysql_store_result(conn);
-		int numrows2 = mysql_num_rows(res);
+		int numrows2 = mysql_num_rows(res2);
 
 		if(numrows2 < 1) {
 			fprintf(stderr, "No record updated!\n%s\n", query);

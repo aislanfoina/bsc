@@ -15,7 +15,7 @@ int getProfile(profile_t *profile, char *type, char *movieDb, MYSQL *conn) {
 
 	char query[4098];
 	sprintf(query, "select * from %s_%s where customer_id = %d", type, movieDb, profile->id);
-
+/*
 	if (mysql_query(conn, query)) {
 		fprintf(stderr, "%s\n", mysql_error(conn));
 		exit(1);
@@ -37,7 +37,7 @@ int getProfile(profile_t *profile, char *type, char *movieDb, MYSQL *conn) {
 		}
 		return -1;
 	}
-
+*/
 	sprintf(query, "select cluster from profiles_Data_%s where customer_id = %d", movieDb, profile->id);
 
 	if (mysql_query(conn, query)) {

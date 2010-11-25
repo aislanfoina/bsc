@@ -19,6 +19,7 @@
 #include "ProfileAnalyses.h"
 #include "ClusterGenerator.h"
 #include "SystemMaintence.h"
+#include "Tools.h"
 
 typedef struct {
 	int id;

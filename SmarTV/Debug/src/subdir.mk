@@ -9,6 +9,7 @@ C_SRCS += \
 ../src/ProfileAnalyses.c \
 ../src/ProfileGenerator.c \
 ../src/SystemMaintence.c \
+../src/Tools.c \
 ../src/csv_parser.c \
 ../src/main.c 
 
@@ -18,6 +19,7 @@ OBJS += \
 ./src/ProfileAnalyses.o \
 ./src/ProfileGenerator.o \
 ./src/SystemMaintence.o \
+./src/Tools.o \
 ./src/csv_parser.o \
 ./src/main.o 
 
@@ -27,6 +29,7 @@ C_DEPS += \
 ./src/ProfileAnalyses.d \
 ./src/ProfileGenerator.d \
 ./src/SystemMaintence.d \
+./src/Tools.d \
 ./src/csv_parser.d \
 ./src/main.d 
 

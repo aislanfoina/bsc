@@ -13,6 +13,7 @@
 #include "SSACT.h"
 #include "constants.h"
 
-int getRate(profile_t *profile, int idMovie, float *rate, char *rateDb, char *movieDb, MYSQL *conn);
+int cleanRatings(MYSQL *conn);
+int getIds(int *ids, MYSQL *conn);
 
 #endif /* COLABORATIVERECOMMENDER_H_ */

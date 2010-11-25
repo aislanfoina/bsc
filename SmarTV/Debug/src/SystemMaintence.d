@@ -4,7 +4,8 @@ src/SystemMaintence.d src/SystemMaintence.o: ../src/SystemMaintence.c \
  /usr/include/mysql/mysql_time.h /usr/include/mysql/my_list.h \
  /usr/include/mysql/typelib.h /usr/include/mysql/my_alloc.h \
  ../src/ProfileGenerator.h ../src/constants.h ../src/SSACT.h \
- ../src/ProfileAnalyses.h ../src/ClusterGenerator.h ../src/csv_parser.h
+ ../src/ProfileAnalyses.h ../src/ClusterGenerator.h ../src/csv_parser.h \
+ ../src/Tools.h
 
 ../src/SystemMaintence.h:
 
@@ -33,3 +34,5 @@ src/SystemMaintence.d src/SystemMaintence.o: ../src/SystemMaintence.c \
 ../src/ClusterGenerator.h:
 
 ../src/csv_parser.h:
+
+../src/Tools.h:

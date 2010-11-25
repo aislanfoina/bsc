@@ -23,6 +23,8 @@ int main(void) {
 	char *password = "root"; /* set me first */
 	char *database = "sandbox";
 
+	char query[4098];
+
 	conn = mysql_init(NULL);
 
 	/* Connect to database */
@@ -46,10 +48,15 @@ int main(void) {
 		 */
 
 //		int ids[] = { 123120, 2118461, 1932594, 2143500, 1977959 };
-		int ids[] = { 123120, 2118461, 1932594, 2143500, 1977959, 1570292,
-				2482738, 676682, 307530, 1228542, 1404976, 2311335, 780341 };
+//		int ids[] = { 123120, 2118461, 1932594, 2143500, 1977959, 1570292,
+//				2482738, 676682, 307530, 1228542, 1404976, 2311335, 780341 };
 
-		int pListLen = sizeof(ids)/sizeof(int);
+		int *ids;
+
+		ids = malloc(400000*sizeof(int));
+		int numIds = getIds(ids, conn);
+
+		int pListLen = numIds;
 		pList = malloc(pListLen * sizeof(profile_t));
 		for(i = 0; i < pListLen; i++) {
 			pList[i].id = ids[i];
@@ -61,17 +68,42 @@ int main(void) {
 			int i;
 			// get all profiles
 			for (i = 0; i < pListLen; i++) {
+
+				if((i%1000) == 0 || i == pListLen-1)
+					printf("%d of %d (%f%%) profiles loaded...\n", i, pListLen, ((float)i/(float)(pListLen-1))*100);
+
 				getProfile(&pList[i], "profiles_RateCntPer", "Allmovie", conn);
 			}
 			// colaborative recommendations
 
 			float *rate = malloc(sizeof(float));
 
-			int movieId = 1;
+//			int movieId = 1;
+			int *movieIds;
+
+			movieIds = malloc(100000*sizeof(int));
 
 			for (i = 0; i < pListLen; i++) {
-				getRate(&pList[i], movieId, rate, "Allmovie", conn);
-				printf(" Rate for movie %d and user %d[%d] is %f\n", movieId, pList[i].id, pList[i].cluster, *rate);
+
+				if((i%10) == 0 || i == pListLen-1)
+					printf("%d of %d (%f%%) predictions processed...\n", i, pListLen, ((float)i/(float)(pListLen-1))*100);
+
+				int numMoviesIds = getMovieIds(&pList[i], movieIds, conn);
+
+				int j;
+
+				for (j = 0; j < numMoviesIds; j++) {
+
+					getRate(&pList[i], movieIds[j], rate, "ratings_noprobe", "Allmovie", conn);
+//					printf("\tRate for movie %d and user %d[%d] is %f\n", movieIds[j], pList[i].id, pList[i].cluster, *rate);
+
+					sprintf(query, "update probe set prediction = %f where movie_id = %d and customer_id = %d;", *rate, movieIds[j], pList[i].id);
+
+					if (mysql_query(conn, query)) {
+						fprintf(stderr, "%s\n", mysql_error(conn));
+						exit(1);
+					}
+				}
 			}
 			printf("\n\n");
 
@@ -79,6 +111,7 @@ int main(void) {
 			// content based recommendations
 
 			// compare with the medium profile to get the like, dontcare, notlike for each profile
+/*
 			profile_t meanProf;
 			meanProf.id = 0;
 			getProfile(&meanProf, "profiles_RateCntPer", "Allmovie", conn);
@@ -86,7 +119,9 @@ int main(void) {
 			for (i = 0; i < pListLen; i++) {
 				subProf(&pList[i], &pList[i], &meanProf);
 			}
+*/
 			// combine recommendations
+
 				// get biggest number of likes and smallest number of notlike (create a score for each genre)
 				// look at the options available and choose the ones with this genre
 
