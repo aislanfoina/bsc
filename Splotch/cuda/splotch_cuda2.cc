@@ -172,6 +172,9 @@ THREADFUNC cu_thread_func(void *pinfo)
   return 1;
   }
 
+
+//#pragma css task inout(pinfo) target smp
+
 THREADFUNC cu_draw_chunk(void *pinfo)
   {
   wallTimer timer, timer1;
@@ -194,10 +197,15 @@ THREADFUNC cu_draw_chunk(void *pinfo)
   cu_gpu_vars gv;
   memset(&gv, 0, sizeof(cu_gpu_vars));
 
+#pragma css start
+
   //CUDA Init
   timer.reset();
   timer.start();
+
+  //initialize the cuda device and get the parameters. not necessary!
   cu_init(params, tInfo->devID, &gv);
+
   timer.stop();
   time =timer.acc();
   tInfo->times[CUDA_INIT]=time;
@@ -206,8 +214,14 @@ THREADFUNC cu_draw_chunk(void *pinfo)
   timer.reset();
   timer.start();
   //copy data to local C-like array d_particle_data, in mid of developing only
+
+  // Data copy. No GPU involved... keep as it is...
   for (int i=tInfo->startP,j=0; i<=tInfo->endP; i++, j++)
     memcpy( &(d_particle_data[j]), &(particle_data[i]), sizeof(cu_particle_sim));
+
+ /// Populate the particle data
+  gv.d_pd = d_particle_data;
+
   timer.stop();
   time =timer.acc();
   tInfo->times[COPY2C_LIKE]=time;
@@ -218,10 +232,18 @@ THREADFUNC cu_draw_chunk(void *pinfo)
   timer.reset();
   timer.start();
 
-  cu_range(params, d_particle_data, nParticle, &gv);
+  // One kernel and some min/max functions. Check what to do with the comparison. Just populate the gv with d_particle_data
+
+//  cu_range(params, d_particle_data, nParticle, &gv);
+  cu_range_task(params, d_particle_data, nParticle, &gv);
+
+
+#pragma css barrier
+
   timer.stop();
   time =timer.acc();
   tInfo->times[RANGE]=time;
+
 
   //CUDA Transformation
   timer.reset();
@@ -229,10 +251,19 @@ THREADFUNC cu_draw_chunk(void *pinfo)
   double  c[3]={campos.x, campos.y, campos.z},
           l[3]={lookat.x, lookat.y, lookat.z},
           s[3]={sky.x, sky.y,     sky.z};
-  cu_transform(params, nParticle,c, l, s,d_particle_data, &gv);
+
+
+//  cu_transform(params, nParticle,c, l, s,d_particle_data, &gv);
+  cu_transform_task(params, nParticle,c, l, s,d_particle_data, &gv);
+
+#pragma css barrier
+
   timer.stop();
   time =timer.acc();
   tInfo->times[TRANSFORMATION]=time;
+
+
+
 
 /* temporarily ignore sorting 191109.
    it becomes complicated when using multiple threads with sorting
@@ -303,7 +334,13 @@ PROBLEM HERE!
   memset(cu_ps, 0, size);
 
   //Colorize with device
-  cu_colorize(params, cu_ps, size, &gv);
+
+
+//  cu_colorize(params, cu_ps, size, &gv);
+  cu_colorize_task(params, cu_ps, size, &gv);
+
+#pragma css barrier
+
   timer.stop();
   time =timer.acc();
   tInfo->times[COLORIZE]=time;
@@ -445,7 +482,11 @@ PROBLEM HERE!
     fragBufAneqE =new cu_fragment_AneqE[nFBufInCell];
     }
 
-  cu_prepare_render(cu_ps_filtered,pFiltered, &gv);
+
+// Not necessary anymore, just memory allocation, etc...
+//A  cu_prepare_render(cu_ps_filtered,pFiltered, &gv);
+//  cu_prepare_render_task(cu_ps_filtered,pFiltered, &gv);
+
 
   //clear the output pic
   tInfo->pPic ->fill(COLOUR(0.0, 0.0, 0.0));
@@ -493,7 +534,10 @@ PROBLEM HERE!
       bFinished =true;
 
     //render it
-    cu_render1(renderStartP, renderEndP, a_eq_e, grayabsorb, &gv);
+//    cu_render1(renderStartP, renderEndP, a_eq_e, grayabsorb, &gv);
+    cu_render1_task(renderStartP, renderEndP, a_eq_e, grayabsorb, &gv);
+
+#pragma css barrier
 
     //see if it's the first chunk
     if ( renderStartP!=0 )
@@ -525,9 +569,18 @@ PROBLEM HERE!
   tInfo->times[RENDER]=time;
   tInfo->times[COMBINE]=param.timeUsed;
 
+
+
 /////////////////////////////////////////////////////////////////////
 
-  cu_end(&gv);
+
+// Just deallocation. Not necessary.
+//A  cu_end(&gv);
+
+#pragma css finish
+
+
+
   delete []d_particle_data;
   delete  []amapD;
   delete  []amapDTypeStartPos;
@@ -696,3 +749,23 @@ void render_cuda(paramfile &params, int &res, arr2<COLOUR> &pic)
   delete [] tHandle;
 #endif
   }
+
+#pragma css task input(params, h_pd, n) inout (pgv) target device (cuda)
+void cu_range_task(paramfile &params, cu_particle_sim* h_pd, unsigned int n, cu_gpu_vars* pgv) {
+	cu_range(params, h_pd, n, pgv);
+}
+
+#pragma css task input(fparams, n, c[3], l[3], s[3], h_pd) inout (pgv) target device (cuda)
+void cu_transform_task(paramfile &fparams, unsigned int n, double c[3], double l[3], double s[3], cu_particle_sim* h_pd, cu_gpu_vars* pgv) {
+	cu_transform(fparams, n, c, l, s, h_pd, pgv);
+}
+
+#pragma css task input(params, h_ps, n) inout (pgv) target device (cuda)
+void cu_colorize_task(paramfile &params, cu_particle_splotch *h_ps, int n, cu_gpu_vars* pgv) {
+	cu_colorize(params, h_ps, n, pgv);
+}
+
+#pragma css task input(startP, endP, a_eq_e, grayabsorb) inout (pgv) target device (cuda)
+void cu_render1_task(int startP, int endP, bool a_eq_e, double grayabsorb, cu_gpu_vars* pgv) {
+	cu_render1(startP, endP, a_eq_e, grayabsorb, pgv);
+}

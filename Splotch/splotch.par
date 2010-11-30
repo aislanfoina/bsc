@@ -101,7 +101,7 @@ fov=30
 max_region =1024
 
 #the size of fragment buffer in Megabyte
-fragment_buffer_size =640
+#fragment_buffer_size =640
 
 #the size of a CUDA block
 #block_size =512

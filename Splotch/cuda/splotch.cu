@@ -81,7 +81,7 @@ paramfile &params, double c[3], double l[3], double s[3])
 extern "C"
 void cu_init(paramfile &params, int devID, cu_gpu_vars* pgv)
   {
-  cudaSetDevice (devID); // initialize cuda runtime
+//A  cudaSetDevice (devID); // initialize cuda runtime
 
 //  int d;
 //  cudaGetDevice(&d);
@@ -90,17 +90,29 @@ void cu_init(paramfile &params, int devID, cu_gpu_vars* pgv)
   pgv->policy =new CuPolicy(params); // Initialize pgv->policy class
   }
 
+/**
+ *
+ * TODO: Have to populate the PGV variable and send it as paramemter to the task
+ * k_range1<<<dimGrid,dimBlock>>>(d_pr, pgv->d_pd, n);
+ *
+ */
+
 extern "C"
 void cu_range(paramfile &params ,cu_particle_sim* h_pd,
   unsigned int n, cu_gpu_vars* pgv)
   {
   //allocate device memory for particle data
   int s =pgv->policy->GetSizeDPD(n); //allocate device memory for particle data
+
+//// cu_gpu_vars* pgv populate solve this mallocs.
+
   //one more space allocated for the dumb
-  cutilSafeCall(cudaMalloc((void**) &pgv->d_pd, s +sizeof(cu_particle_sim)));
+
+//A  cutilSafeCall(cudaMalloc((void**) &pgv->d_pd, s +sizeof(cu_particle_sim)));
 
   //copy particle data to device
-  cutilSafeCall(cudaMemcpy(pgv->d_pd, h_pd, s, cudaMemcpyHostToDevice) );
+//A  cutilSafeCall(cudaMemcpy(pgv->d_pd, h_pd, s, cudaMemcpyHostToDevice) );
+
   //ask for dims from pgv->policy
   dim3 dimGrid, dimBlock;
   pgv->policy->GetDimsRange(n, &dimGrid, &dimBlock);

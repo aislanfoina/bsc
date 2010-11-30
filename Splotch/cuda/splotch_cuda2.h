@@ -57,4 +57,10 @@ void DevideThreadsTasks(thread_info *tInfo, int nThread, bool bHostThread);
 
 void render_cuda(paramfile &params, int &res, arr2<COLOUR> &pic);
 
+//void cu_range_task(paramfile &params, cu_particle_sim* h_pd, unsigned int n, cu_gpu_vars* pgv);
+void cu_range_task(paramfile &params, cu_particle_sim* h_pd, unsigned int n, cu_gpu_vars* pgv);
+void cu_transform_task(paramfile &fparams, unsigned int n, double c[3], double l[3], double s[3], cu_particle_sim* h_pd, cu_gpu_vars* pgv);
+void cu_colorize_task(paramfile &params, cu_particle_splotch *h_ps, int n, cu_gpu_vars* pgv);
+void cu_render1_task(int startP, int endP, bool a_eq_e, double grayabsorb, cu_gpu_vars* pgv);
+
 #endif
