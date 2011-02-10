@@ -60,16 +60,59 @@ int cleanRatings(MYSQL *conn) {
 	return 0;
 }
 
+int fixProbe(profile_t *profile, int idMovie, float *rate, char *rateDb, MYSQL *conn) {
+	MYSQL_RES *res;
+	MYSQL_ROW row;
+
+	char query[4098];
+	sprintf(query, "select rating from %s where movie_id = %d and customer_id = %d;",
+			rateDb, idMovie, profile->id);
+
+	/*
+	 * select sum(rating) / count(rating) as rate, count(rating) as numRate, cluster from ratings, profiles_Data_Allmovie where ratings.customer_id = profiles_Data_Allmovie.customer_id and movie_id = 8 group by cluster;
+	 */
+
+
+	if (mysql_query(conn, query)) {
+		fprintf(stderr, "%s\n", mysql_error(conn));
+		exit(1);
+	}
+
+	res = mysql_store_result(conn);
+
+	int numrows = mysql_num_rows(res);
+
+	if (numrows > 0) {
+		while ((row = mysql_fetch_row(res)) != NULL) {
+			if(atoi(row[0]) > 0) {
+				*rate = atof(row[0]);
+			}
+			else
+				*rate = -1;
+		}
+	}
+	else
+		*rate = -1;
+
+	mysql_free_result(res);
+
+	return 0;
+}
+
+
+
 int getIds(int *ids, MYSQL *conn) {
 	MYSQL_RES *res;
 	MYSQL_ROW row;
 
 	char query[4098];
 
-	int block = 10000;
+	int block = 1000;
 	int x = 0;
-	int off = 7280;
-	sprintf(query, "select distinct customer_id from probe limit %d,%d;",x*block+off,block);
+	int off = 0;
+	//	sprintf(query, "select distinct customer_id from probe limit %d,%d;",x*block+off,block);
+	sprintf(query, "select distinct customer_id from probe where prediction = -1 order by rating limit %d,%d;",x*block+off,block);
+//	sprintf(query, "select distinct customer_id from probe where rating = -1 limit %d,%d;",x*block+off,block);
 
 	if (mysql_query(conn, query)) {
 		fprintf(stderr, "%s\n", mysql_error(conn));
@@ -97,6 +140,7 @@ int getIds(int *ids, MYSQL *conn) {
 
 		}
 	}
+	mysql_free_result(res);
 
 	return numrows;
 }
@@ -134,6 +178,8 @@ int getMovieIds(profile_t *profile, int *movieIds, MYSQL *conn) {
 //		printf("%d movies loaded...\n", k);
 
 	}
+
+	mysql_free_result(res);
 
 	return numrows;
 }

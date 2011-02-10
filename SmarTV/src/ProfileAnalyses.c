@@ -54,6 +54,8 @@ int getProfile(profile_t *profile, char *type, char *movieDb, MYSQL *conn) {
 		profile->cluster = 0;
 		return -1;
 	}
+	mysql_free_result(res);
+
 	return 0;
 }
 
@@ -95,6 +97,8 @@ int getFriendsProfile(profile_t *profile, profile_t *ret_profiles, char *type, c
 
 		i++;
 	}
+
+	mysql_free_result(res);
 
 	return 0;
 }

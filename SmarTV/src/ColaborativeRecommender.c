@@ -43,5 +43,7 @@ int getRate(profile_t *profile, int idMovie, float *rate, char *rateDb, char *mo
 	else
 		*rate = -1;
 
+	mysql_free_result(res);
+
 	return 0;
 }

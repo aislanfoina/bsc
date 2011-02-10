@@ -10,6 +10,7 @@
 int main(void) {
 	int run = 1;
 	profile_t *pList;
+	int *ids;
 	int pListChange;
 
 	int i;
@@ -51,8 +52,6 @@ int main(void) {
 //		int ids[] = { 123120, 2118461, 1932594, 2143500, 1977959, 1570292,
 //				2482738, 676682, 307530, 1228542, 1404976, 2311335, 780341 };
 
-		int *ids;
-
 		ids = malloc(400000*sizeof(int));
 		int numIds = getIds(ids, conn);
 
@@ -63,6 +62,11 @@ int main(void) {
 		}
 
 		pListChange = 1;
+
+		if(numIds == 0) {
+			run = 0;
+			pListChange = 0;
+		}
 
 		if(pListChange) {
 			int i;
@@ -93,8 +97,18 @@ int main(void) {
 				int j;
 
 				for (j = 0; j < numMoviesIds; j++) {
+/*					float *probeRate = malloc(sizeof(float));
+					fixProbe(&pList[i], movieIds[j], probeRate, "ratings", conn);
 
-					getRate(&pList[i], movieIds[j], rate, "ratings_noprobe", "Allmovie", conn);
+					sprintf(query, "update probe set rating = %f where movie_id = %d and customer_id = %d;", *probeRate, movieIds[j], pList[i].id);
+
+					if (mysql_query(conn, query)) {
+						fprintf(stderr, "%s\n", mysql_error(conn));
+						exit(1);
+					}
+					free(probeRate);*/
+
+					getRate(&pList[i], movieIds[j], rate, "ratings", "Allmovie", conn);
 //					printf("\tRate for movie %d and user %d[%d] is %f\n", movieIds[j], pList[i].id, pList[i].cluster, *rate);
 
 					sprintf(query, "update probe set prediction = %f where movie_id = %d and customer_id = %d;", *rate, movieIds[j], pList[i].id);
@@ -126,8 +140,14 @@ int main(void) {
 				// look at the options available and choose the ones with this genre
 
 			// send the recommendations for each one, and for the group
-
+//			run = 0;
+			free(rate);
+			free(movieIds);
 		}
+
+		free(ids);
+		free(pList);
+
 
 	}
 
