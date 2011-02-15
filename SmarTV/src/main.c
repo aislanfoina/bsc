@@ -7,6 +7,47 @@
 
 #include "SSACT.h"
 
+double maintime_int(int print) {
+
+        double elapsed_seconds = 0;
+        static struct timeval t1; /* var for previous time stamp */
+        static struct timeval t2; /* var of current time stamp */
+
+        if (gettimeofday(&t2, NULL) == -1) {
+                perror("gettimeofday");
+                exit(9);
+        }
+
+        if (print) {
+                elapsed_seconds = (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec) * 1e-6;
+                printf("Time spent [%.2fs] \n", elapsed_seconds);
+        }
+
+        t1 = t2;
+        return elapsed_seconds;
+}
+
+double time_int(int print) {
+
+        double elapsed_seconds = 0;
+        static struct timeval t1; /* var for previous time stamp */
+        static struct timeval t2; /* var of current time stamp */
+
+        if (gettimeofday(&t2, NULL) == -1) {
+                perror("gettimeofday");
+                exit(9);
+        }
+
+        if (print) {
+                elapsed_seconds = (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec) * 1e-6;
+                printf("Time spent [%.2fs] \n", elapsed_seconds);
+        }
+
+        t1 = t2;
+        return elapsed_seconds;
+}
+
+
 int main(void) {
 	int run = 1;
 	profile_t *pList;
@@ -33,6 +74,10 @@ int main(void) {
 		fprintf(stderr, "%s\n", mysql_error(conn));
 		exit(1);
 	}
+
+	printf("Start timer!\n");
+	maintime_int(0);
+	time_int(0);
 
 	while (run) {
 
@@ -147,10 +192,11 @@ int main(void) {
 
 		free(ids);
 		free(pList);
+		time_int(1);
 
 
 	}
-
+	maintime_int(1);
 	mysql_close(conn);
 
 	return EXIT_SUCCESS;
