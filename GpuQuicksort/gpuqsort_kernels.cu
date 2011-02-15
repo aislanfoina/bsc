@@ -19,17 +19,17 @@
 * "This code is released free of charge for use in
 * derivative works, whether academic, commercial, or personal"
 * - CUDA Website
-* 
+*
 * http://developer.download.nvidia.com/licenses/general_license.txt
 *
 **/
 
-#include "gpuqsort.h"
+#include "sscc_gpuqsort.h"
 
 #undef THREADS
 #define THREADS blockDim.x
 
-extern __shared__ unsigned int sarray[]; 
+extern __shared__ unsigned int sarray[];
 
 #ifdef HASATOMICS
 __device__ unsigned int ohtotal = 0;
@@ -90,7 +90,7 @@ void bitonicSort(unsigned int* fromvalues, unsigned int* tovalues, unsigned int 
 			for(int tid=threadIdx.x;tid<sb;tid+=THREADS)
 			{
 				unsigned int ixj = tid ^ j;
-	            
+
 				if (ixj > tid)
 				{
 					if ((tid & k) == 0)
@@ -109,7 +109,7 @@ void bitonicSort(unsigned int* fromvalues, unsigned int* tovalues, unsigned int 
 					}
 				}
             }
-            
+
             __syncthreads();
         }
     }
@@ -132,53 +132,53 @@ __device__ inline void cumcount(unsigned int *lblock, unsigned int *rblock)
 {
 	int tx = threadIdx.x;
 
-    int offset = 1; 
- 
+    int offset = 1;
+
     __syncthreads();
 
-	for (int d = THREADS>>1; d > 0; d >>= 1) // build sum in place up the tree 
+	for (int d = THREADS>>1; d > 0; d >>= 1) // build sum in place up the tree
     {
         __syncthreads();
 
-		if (tx < d)    
-        { 
+		if (tx < d)
+        {
 			int ai = offset*(2*tx+1)-1;
             int bi = offset*(2*tx+2)-1;
             lblock[bi] += lblock[ai];
 			rblock[bi] += rblock[ai];
-		} 
-        offset *= 2; 
-    } 
-	__syncthreads(); 
-    if (tx == 0) 
-	{ 
+		}
+        offset *= 2;
+    }
+	__syncthreads();
+    if (tx == 0)
+	{
 		lblock[THREADS] = lblock[THREADS-1];
 		rblock[THREADS] = rblock[THREADS-1];
 		lblock[THREADS - 1] =0;
-		rblock[THREADS - 1] =0; 
+		rblock[THREADS - 1] =0;
 	} // clear the last unsigned int */
-	__syncthreads(); 
+	__syncthreads();
 
-    for (int d = 1; d < THREADS; d *= 2) // traverse down tree & build scan 
-    { 
-        offset >>= 1; 
-        __syncthreads(); 
- 
-        if (tx < d) 
-        { 
-			int ai = offset*(2*tx+1)-1; 
-            int bi = offset*(2*tx+2)-1; 
- 
-            int t   = lblock[ai]; 
-			lblock[ai]  = lblock[bi]; 
-            lblock[bi] += t; 
+    for (int d = 1; d < THREADS; d *= 2) // traverse down tree & build scan
+    {
+        offset >>= 1;
+        __syncthreads();
 
-            t   = rblock[ai]; 
-            rblock[ai]  = rblock[bi]; 
-            rblock[bi] += t; 
+        if (tx < d)
+        {
+			int ai = offset*(2*tx+1)-1;
+            int bi = offset*(2*tx+2)-1;
 
-        } 
-    } 
+            int t   = lblock[ai];
+			lblock[ai]  = lblock[bi];
+            lblock[bi] += t;
+
+            t   = rblock[ai];
+            rblock[ai]  = rblock[bi];
+            rblock[bi] += t;
+
+        }
+    }
 }
 
 
@@ -191,14 +191,14 @@ __device__ inline void cumcount(unsigned int *lblock, unsigned int *rblock)
 * @param lengths The total sum for each thread block is stored here
 */
 //template <typename unsigned int>
-__global__ void part1(unsigned int* data, struct Params<unsigned int>* params, struct Hist* hist, Length<unsigned int>* lengths)
+__global__ void part1(unsigned int* data, Params* params, Hist* hist, Length* lengths)
 {
 	const int tx = threadIdx.x;
 
 	unsigned int* lblock = (unsigned int*)sarray;
 	unsigned int* rblock = (unsigned int*)(&lblock[(blockDim.x+1)]);
 	unsigned int* minpiv = (unsigned int*)(&rblock[(blockDim.x+1)]);
-	unsigned int* maxpiv = (unsigned int*)(&minpiv[blockDim.x]); 
+	unsigned int* maxpiv = (unsigned int*)(&minpiv[blockDim.x]);
 
 
 	// Where should we read?
@@ -279,7 +279,7 @@ __global__ void part1(unsigned int* data, struct Params<unsigned int>* params, s
 		}
 	  }
   	__syncthreads();
-	
+
 	// Store each threads part of the cumulative count
 	hist->left[blockIdx.x*(THREADS)+threadIdx.x]  = lblock[threadIdx.x+1];
 	hist->right[blockIdx.x*(THREADS)+threadIdx.x] = rblock[threadIdx.x+1];
@@ -303,7 +303,7 @@ __global__ void part1(unsigned int* data, struct Params<unsigned int>* params, s
 * @param lengths The total sum for each thread block is stored here
 */
 //template <typename unsigned int>
-__global__ void part2(unsigned int* data, unsigned int* data2, struct Params<unsigned int>* params, struct Hist* hist, Length<unsigned int>* lengths)
+__global__ void part2(unsigned int* data, unsigned int* data2, Params* params, Hist* hist, Length* lengths)
 {
 	const int tx = threadIdx.x;
 	const int bx = blockIdx.x;
@@ -369,7 +369,7 @@ __global__ void part2(unsigned int* data, unsigned int* data2, struct Params<uns
 * @param lengths The total sum for each thread block is stored here
 */
 //template <typename unsigned int>
-__global__ void part3(unsigned int* data, struct Params<unsigned int>* params, struct Hist* hist, Length<unsigned int>* lengths)
+__global__ void part3(unsigned int* data, Params* params, Hist* hist, Length* lengths)
 {
 	const int tx = threadIdx.x;
 	const int bx = blockIdx.x;
@@ -398,7 +398,7 @@ __global__ void part3(unsigned int* data, struct Params<unsigned int>* params, s
 *               in \a adata or \a adata2
 */
 //template <typename unsigned int>
-__global__ void lqsort(unsigned int* adata, unsigned int* adata2, struct LQSortParams* bs, unsigned int phase)
+__global__ void lqsort(unsigned int* adata, unsigned int* adata2, LQSortParams* bs, unsigned int phase)
 {
 	__shared__ unsigned int lphase;
 	lphase=phase;
@@ -408,7 +408,7 @@ __global__ void lqsort(unsigned int* adata, unsigned int* adata2, struct LQSortP
 
 	// Stack pointer
 	__shared__ int bi;
-	
+
 	// Stack unsigned ints
 	__shared__ unsigned int beg[32];
 	__shared__ unsigned int end[32];
@@ -439,13 +439,13 @@ __global__ void lqsort(unsigned int* adata, unsigned int* adata2, struct LQSortP
 #else
 		bx = blockIdx.x;
 #endif
-		
+
 	__syncthreads();
 
 	while(bx<gridDim.x)
 	{
 
-	
+
 
 	// Thread 0 is in charge of the stack operations
 	if(tx==0)
@@ -489,7 +489,7 @@ __global__ void lqsort(unsigned int* adata, unsigned int* adata2, struct LQSortP
 			}
 
 		}
-	
+
 
 		__syncthreads();
 
@@ -512,7 +512,7 @@ __global__ void lqsort(unsigned int* adata, unsigned int* adata2, struct LQSortP
 			continue;
 		}
 
- 
+
 		if(tx==0)
 		{
 			// Create a new pivot for the sequence
@@ -528,7 +528,7 @@ __global__ void lqsort(unsigned int* adata, unsigned int* adata2, struct LQSortP
 		unsigned int lr=0;
 
 		__syncthreads();
-		
+
 		unsigned int coal = (from)&0xf;
 
 		if(tx+from-coal<to)
@@ -566,7 +566,7 @@ __global__ void lqsort(unsigned int* adata, unsigned int* adata2, struct LQSortP
 		// cumulative sum
 		lblock[tx]=ll;
 		rblock[tx]=lr;
-		
+
 		__syncthreads();
 
 		// Calculate the cumulative sum
@@ -598,12 +598,12 @@ __global__ void lqsort(unsigned int* adata, unsigned int* adata2, struct LQSortP
 			// Increment the stack pointer
 			bi++;
 		}
-		
+
 		__syncthreads();
 
 		unsigned int x = from+lblock[tx+1]-1;
 		unsigned int y = to-rblock[tx+1];
-		
+
 		coal = from&0xf;
 
 		if(tx+from-coal<to)
@@ -623,15 +623,15 @@ __global__ void lqsort(unsigned int* adata, unsigned int* adata2, struct LQSortP
 		// Go through the data once again
 		// writing it to its correct position
 		for(unsigned int i=from+tx+THREADS-coal;i<to;i+=THREADS)
-		{	
+		{
 			unsigned int d = data[i];
-			
+
 			if(d<pivot)
 				data2[x--] = d;
 			else
 			if(d>pivot)
 				data2[y++] = d;
-			
+
 		}
 
 		__syncthreads();

@@ -14,76 +14,29 @@
 #define BUILDING_DLL
 
 #include "stdio.h"
-#include "gpuqsort.h"
+#include "sscc_gpuqsort.h"
 
 #include "simpletimer.cu"
 
 #include <algorithm>
 
 // Keep tracks of the data blocks in phase one
-template <typename element>
-struct BlockSize
-{
-	unsigned int beg;
-	unsigned int end;
-	unsigned int orgbeg;
-	unsigned int orgend;
-	element		 rmaxpiv;
-	element		 lmaxpiv;
-	element		 rminpiv;
-	element		 lminpiv;
-
-	bool		 altered;
-	bool		 flip;
-	element		 pivot;
-};
-
-// Holds parameters to the kernel in phase one
-template <typename element>
-struct Params
-{
-	unsigned int from;
-	unsigned int end;
-	element pivot;
-	unsigned int ptr;
-	bool last;
-};
-
-// Used to perform a cumulative sum between blocks.
-// Unnecessary for cards with atomic operations.
-// Will be removed when these becomes more common
-template <typename element>
-struct Length
-{
-	element maxpiv[MAXBLOCKS];
-	element minpiv[MAXBLOCKS];
-
-	unsigned int left[MAXBLOCKS];
-	unsigned int right[MAXBLOCKS];
-};
-
-// Since we have divided up the kernel in to three
-// we need to remember the result of the cumulative sum
-// Unnecessary for cards with atomic operations.
-// Will be removed when these becomes more common
-struct Hist
-{
-	unsigned int left[(MAXTHREADS)*MAXBLOCKS];
-	unsigned int right[(MAXTHREADS)*MAXBLOCKS];
-};
-
-struct LQSortParams
-{
-	unsigned int beg;
-	unsigned int end;
-	bool flip;
-	unsigned int sbsize;
-};
 
 #include "gpuqsort_kernels.cu"
 
 #undef THREADS
 #define THREADS threads
+
+int err;
+
+bool errCheck(int e) {
+	if(e==cudaSuccess)
+		return true;
+
+	err = e;
+	return false;
+}
+
 
 /**
 * The main sort function
@@ -92,9 +45,78 @@ struct LQSortParams
 * @param timerValue Contains the time it took to sort the data [Optional]
 * @returns 0 if successful. For non-zero values, use getErrorStr() for more information about why it failed.
 */
-template <typename element>
-int GPUQSort<element>::sort(element* data, unsigned int size, double* timerValue, unsigned int blockscount, unsigned int threads, unsigned int sbsize, unsigned int phase)
+
+int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int blockscount, unsigned int threads, unsigned int sbsize, unsigned int phase)
 {
+
+	//Metodos
+	element* ddata;
+	element* ddata2;
+	Params* params;
+	Params* dparams;
+
+	LQSortParams* lqparams;
+	LQSortParams* dlqparams;
+
+	Hist* dhists;
+	Length* dlength;
+	Length* length;
+	BlockSize* workset;
+
+	float TK,TM,MK,MM,SM,SK;
+
+	bool init;
+
+
+	// Construtor
+
+
+	cudaDeviceProp deviceProp;
+	cudaGetDeviceProperties(&deviceProp, 0);
+	if(!strcmp(deviceProp.name,"GeForce 8800 GTX"))
+	{
+		TK = 1.17125033316e-005f;
+		TM = 52.855721393f;
+		MK = 3.7480010661e-005f;
+		MM = 476.338308458f;
+		SK = 4.68500133262e-005f;
+		SM = 211.422885572f;
+	}
+	else
+	if(!strcmp(deviceProp.name,"GeForce 8600 GTS"))
+	{
+		TK = 0.0f;
+		TM = 64.0f;
+		MK = 0.0000951623403898f;
+		MM = 476.338308458f;
+		SK = 0.0000321583081317f;
+		SM = 202.666666667f;
+	}
+	else
+	{
+		TK = 0;
+		TM = 128;
+		MK = 0;
+		MM = 512;
+		SK = 0;
+		SM = 512;
+	}
+
+	if(cudaMallocHost((void**)&workset,MAXBLOCKS*2*sizeof(BlockSize))!=cudaSuccess) return -1;
+	if(cudaMallocHost((void**)&params,MAXBLOCKS*sizeof(Params))!=cudaSuccess) return -1;
+	if(cudaMallocHost((void**)&length,sizeof(Length))!=cudaSuccess) return -1;
+	if(cudaMallocHost((void**)&lqparams,MAXBLOCKS*sizeof(LQSortParams))!=cudaSuccess) return -1;
+	if(cudaMalloc((void**)&dlqparams,MAXBLOCKS*sizeof(LQSortParams))!=cudaSuccess) return -1;
+	if(cudaMalloc((void**)&dhists,sizeof(Hist))!=cudaSuccess) return -1;
+	if(cudaMalloc((void**)&dlength,sizeof(Length))!=cudaSuccess) return -1;
+	if(cudaMalloc((void**)&dparams,MAXBLOCKS*sizeof(Params))!=cudaSuccess) return -1;
+
+	init = true;
+
+
+	// Sort
+
+
 	if(!init)
 		return 1;
 
@@ -115,7 +137,7 @@ int GPUQSort<element>::sort(element* data, unsigned int size, double* timerValue
 #endif
 
 	if(threads>MAXTHREADS)
-		return 1; 
+		return 1;
 
 	if(blockscount>MAXBLOCKS)
 		return 1;
@@ -136,7 +158,7 @@ int GPUQSort<element>::sort(element* data, unsigned int size, double* timerValue
 	{
 		// Start measuring time
 		cudaThreadSynchronize();
-		
+
 		st.start();
 	}
 
@@ -183,7 +205,7 @@ int GPUQSort<element>::sort(element* data, unsigned int size, double* timerValue
 				params[paramsize].ptr = i;
 				params[paramsize].last = false;
 				paramsize++;
-				
+
 			}
 			params[paramsize-1].last = true;
 			params[paramsize-1].end = workset[i].end;
@@ -198,7 +220,7 @@ int GPUQSort<element>::sort(element* data, unsigned int size, double* timerValue
 			break;
 
 		// Copy the block assignment to the GPU
-		if(!errCheck(cudaMemcpy(dparams, params, paramsize*sizeof(Params<element>), cudaMemcpyHostToDevice) ))
+		if(!errCheck(cudaMemcpy(dparams, params, paramsize*sizeof(Params), cudaMemcpyHostToDevice) ))
 			return 1;
 
 		// Do the cumulative sum
@@ -206,34 +228,34 @@ int GPUQSort<element>::sort(element* data, unsigned int size, double* timerValue
 			part1<<< paramsize, THREADS, (THREADS+1)*2*4+THREADS*2*4 >>>(ddata,dparams,dhists,dlength);
 		else
 			part1<<< paramsize, THREADS, (THREADS+1)*2*4+THREADS*2*4 >>>(ddata2,dparams,dhists,dlength);
-		if(!errCheck((cudaMemcpy(length, dlength,sizeof(Length<element>) , cudaMemcpyDeviceToHost) )))
-			return 1; 
+		if(!errCheck((cudaMemcpy(length, dlength,sizeof(Length) , cudaMemcpyDeviceToHost) )))
+			return 1;
 
 		// Do the block cumulative sum. Done on the CPU since not all cards have support for
-		// atomic operations yet. 
+		// atomic operations yet.
 		for(unsigned int i=0;i<paramsize;i++)
 		{
 			unsigned int l = length->left[i];
 			unsigned int r = length->right[i];
-			
+
 			length->left[i] = workset[params[i].ptr].beg;
 			length->right[i] = workset[params[i].ptr].end;
-			
+
 			workset[params[i].ptr].beg+=l;
 			workset[params[i].ptr].end-=r;
 			workset[params[i].ptr].altered = true;
-			
+
 			workset[params[i].ptr].rmaxpiv = max(length->maxpiv[i],workset[params[i].ptr].rmaxpiv);
 			workset[params[i].ptr].lminpiv = min(length->minpiv[i],workset[params[i].ptr].lminpiv);
-			
-			workset[params[i].ptr].lmaxpiv = min(workset[params[i].ptr].pivot,workset[params[i].ptr].rmaxpiv); 
-			workset[params[i].ptr].rminpiv = max(workset[params[i].ptr].pivot,workset[params[i].ptr].lminpiv); 
 
-			
+			workset[params[i].ptr].lmaxpiv = min(workset[params[i].ptr].pivot,workset[params[i].ptr].rmaxpiv);
+			workset[params[i].ptr].rminpiv = max(workset[params[i].ptr].pivot,workset[params[i].ptr].lminpiv);
+
+
 		}
 
 		// Copy the result of the block cumulative sum to the GPU
-		if(!errCheck((cudaMemcpy(dlength, length, sizeof(Length<element>), cudaMemcpyHostToDevice) )))
+		if(!errCheck((cudaMemcpy(dlength, length, sizeof(Length), cudaMemcpyHostToDevice) )))
 			return 1;
 
 		// Move the elements to their correct position
@@ -304,7 +326,7 @@ int GPUQSort<element>::sort(element* data, unsigned int size, double* timerValue
 			return 1;
 
 		// Run the local quicksort, the one that doesn't need inter-block synchronization
-		if(phase!=1) 
+		if(phase!=1)
 			lqsort<<< worksize, THREADS, max((THREADS+1)*2*4,sbsize*4) >>>(ddata,ddata2,dlqparams,phase);
 	}
 
@@ -332,81 +354,10 @@ int GPUQSort<element>::sort(element* data, unsigned int size, double* timerValue
 	cudaFree(ddata);
 	cudaFree(ddata2);
 
-	return 0;
-}
 
-template <typename element>
-bool GPUQSort<element>::errCheck(int e)
-{
-	if(e==cudaSuccess)
-		return true;
 
-	err = e;
-	cudaFree(ddata);
-	cudaFree(ddata2);
-	return false;
-}
+	// Destrutor
 
-template <typename element>
-GPUQSort<element>::GPUQSort():init(false),workset(0),params(0),length(0),lqparams(0),dlqparams(0),
-							  dhists(0),dlength(0),dparams(0)
-{
-	cudaDeviceProp deviceProp;
-	cudaGetDeviceProperties(&deviceProp, 0);
-	if(!strcmp(deviceProp.name,"GeForce 8800 GTX"))
-	{
-		TK = 1.17125033316e-005f;
-		TM = 52.855721393f;
-		MK = 3.7480010661e-005f;
-		MM = 476.338308458f;
-		SK = 4.68500133262e-005f;
-		SM = 211.422885572f;
-	}
-	else
-	if(!strcmp(deviceProp.name,"GeForce 8600 GTS"))
-	{
-		TK = 0.0f;
-		TM = 64.0f;
-		MK = 0.0000951623403898f;
-		MM = 476.338308458f;
-		SK = 0.0000321583081317f;
-		SM = 202.666666667f;
-	}
-	else
-	{
-		TK = 0;
-		TM = 128;
-		MK = 0;
-		MM = 512;
-		SK = 0;
-		SM = 512;
-	}
-
-	if(cudaMallocHost((void**)&workset,MAXBLOCKS*2*sizeof(BlockSize<element>))!=cudaSuccess) return;
-	if(cudaMallocHost((void**)&params,MAXBLOCKS*sizeof(Params<element>))!=cudaSuccess) return;
-	if(cudaMallocHost((void**)&length,sizeof(Length<element>))!=cudaSuccess) return;
-	if(cudaMallocHost((void**)&lqparams,MAXBLOCKS*sizeof(LQSortParams))!=cudaSuccess) return;
-	if(cudaMalloc((void**)&dlqparams,MAXBLOCKS*sizeof(LQSortParams))!=cudaSuccess) return;
-	if(cudaMalloc((void**)&dhists,sizeof(Hist))!=cudaSuccess) return;
-	if(cudaMalloc((void**)&dlength,sizeof(Length<element>))!=cudaSuccess) return;
-	if(cudaMalloc((void**)&dparams,MAXBLOCKS*sizeof(Params<element>))!=cudaSuccess) return;
-
-	init = true;
-}
-
-/**
-* Returns the latest error message
-* @returns the latest error message
-*/
-template <typename element>
-const char* GPUQSort<element>::getErrorStr()
-{
-	return cudaGetErrorString((cudaError_t)err);
-}
-
-template <typename element>
-GPUQSort<element>::~GPUQSort()
-{
 	cudaFreeHost(workset);
 	cudaFreeHost(params);
 	cudaFreeHost(length);
@@ -415,34 +366,103 @@ GPUQSort<element>::~GPUQSort()
 	cudaFree(dlqparams);
 	cudaFree(dhists);
 	cudaFree(dlength);
+
+
+	return 0;
 }
 
-// Exported functions
-
-char* expErrMsg = "No errors";
-
- GPUQSort<unsigned int>* s=0;
-
-extern "C" 
-DLLEXPORT int gpuqsort(unsigned int* data, unsigned int size, double* timerValue, unsigned int blockscount, unsigned int threads, unsigned int sbsize, unsigned int phase)
+/**
+* Fills data with elements from a specific distribution
+* @param data List to hold the data
+* @param size The size of the list
+* @param type The type of distribution to pick elements from
+*/
+void dist(element* data, unsigned int size, int type)
 {
-	if(s==0)
-		s=new GPUQSort<unsigned int>();
+	#define MAXVAL 0xffffffe
 
+//	element temp;
+//	unsigned int numThreads = 128;
 
-	if(s->sort(data,size,timerValue, blockscount, threads, sbsize, phase)!=0)
-	{
-		expErrMsg = (char*)s->getErrorStr();
-		return 1;
-	}
-	else
-		return 0;
+	for(unsigned int i=0;i<size;i++)
+		data[i]=(rand() + i)%1000000;
 }
+
+
+
+
+int main() {
+	const unsigned int ITERATIONS = 1;
+	const unsigned int MEASURES = 1;
+	const unsigned int DISTRIBUTIONS = 1;
+	const unsigned int STARTSIZE = 2<<19;
+
+	// Allocate memory for the sequences to be sorted
+	unsigned int maxsize = STARTSIZE<<(MEASURES-1);
+	element* data = new element[maxsize];
+	element* data2 = new element[maxsize];
+
+	double timerValue;
+	unsigned int run = 0;
+
+	// Go through all distributions
+	for(int d=0;d<DISTRIBUTIONS;d++)
+	{
+		unsigned int testsize = STARTSIZE;
+
+		// Go through all sizes
+		for(int i=0;i<MEASURES;i++,testsize<<=1)
+		{
+			// Do it several times
+			for(int q=0;q<ITERATIONS;q++)
+			{
+				// Create sequence according to distribution
+				dist(data,testsize,d);
+				// Store copy of sequence
+				memcpy(data2,data,testsize*sizeof(element));
+
+				int threads  =0;
+				int maxblocks=0;
+				int sbsize   =0;
+
+				printf("Data: \n");
+				for(int z=0; z < testsize; z+=1000)
+					printf("%d ",data[z]);
+				printf("\n\n****************************\n\n\n");
+
+				// Sort it
+				if(gpuqsort(data,testsize,&timerValue,maxblocks,threads,sbsize,0)!=0)
+				{
+					printf("Error!\n");
+					exit(1);
+				}
+
+				printf("Data: \n");
+				for(int z=0; z < testsize; z+=1000)
+					printf("%d ",data[z]);
+				printf("\n");
+
+
+				// Validate the result
+				printf("%d/%d!\n",run++,MEASURES*DISTRIBUTIONS*ITERATIONS);
+			}
+		}
+	}
+
+}
+
+
+
+
+
+
+
+
 
 // Float support removed due to some problems with CUDA 2.0 and templates
 // Will be fixed
 
-//extern "C" DLLEXPORT 
+//extern "C" DLLEXPORT
 /*int gpuqsortf(float* data, unsigned int size, double* timerValue)
 {
 	GPUQSort<float> s;
@@ -455,8 +475,3 @@ DLLEXPORT int gpuqsort(unsigned int* data, unsigned int size, double* timerValue
 		return 0;
 }*/
 
-extern "C"
-DLLEXPORT const char* getGPUSortErrorStr()
-{
-	return expErrMsg;
-}
