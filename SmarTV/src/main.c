@@ -50,6 +50,10 @@ double time_int(int print) {
 
 int main(void) {
 	int run = 1;
+	int collaborative = 1;
+	int content = 0;
+	int merge = 0;
+
 	profile_t *pList;
 	int *ids;
 	int pListChange;
@@ -123,7 +127,6 @@ int main(void) {
 
 				getProfile(&pList[i], "profiles_RateCntPer", "Allmovie", conn);
 			}
-			// colaborative recommendations
 
 			float *rate = malloc(sizeof(float));
 
@@ -135,56 +138,64 @@ int main(void) {
 			for (i = 0; i < pListLen; i++) {
 
 				if((i%10) == 0 || i == pListLen-1)
-					printf("%d of %d (%f%%) predictions processed...\n", i, pListLen, ((float)i/(float)(pListLen-1))*100);
+					printf("%d of %d (%f%%) profiles processed...\n", i, pListLen, ((float)i/(float)(pListLen-1))*100);
 
-				int numMoviesIds = getMovieIds(&pList[i], movieIds, conn);
+				// Collaborative recommendation
 
-				int j;
+				if(collaborative) {
 
-				for (j = 0; j < numMoviesIds; j++) {
-/*					float *probeRate = malloc(sizeof(float));
-					fixProbe(&pList[i], movieIds[j], probeRate, "ratings", conn);
+					int numMoviesIds = getMovieIds(&pList[i], movieIds, conn);
 
-					sprintf(query, "update probe set rating = %f where movie_id = %d and customer_id = %d;", *probeRate, movieIds[j], pList[i].id);
+					int j;
 
-					if (mysql_query(conn, query)) {
-						fprintf(stderr, "%s\n", mysql_error(conn));
-						exit(1);
-					}
-					free(probeRate);*/
+					for (j = 0; j < numMoviesIds; j++) {
+	//					float *probeRate = malloc(sizeof(float));
+	//					fixProbe(&pList[i], movieIds[j], probeRate, "ratings", conn);
 
-					getRate(&pList[i], movieIds[j], rate, "ratings", "Allmovie", conn);
-//					printf("\tRate for movie %d and user %d[%d] is %f\n", movieIds[j], pList[i].id, pList[i].cluster, *rate);
+	//					sprintf(query, "update probe set rating = %f where movie_id = %d and customer_id = %d;", *probeRate, movieIds[j], pList[i].id);
 
-					sprintf(query, "update probe set prediction = %f where movie_id = %d and customer_id = %d;", *rate, movieIds[j], pList[i].id);
+	//					if (mysql_query(conn, query)) {
+	//						fprintf(stderr, "%s\n", mysql_error(conn));
+	//						exit(1);
+	//					}
+	//					free(probeRate);
 
-					if (mysql_query(conn, query)) {
-						fprintf(stderr, "%s\n", mysql_error(conn));
-						exit(1);
+						getRate(&pList[i], movieIds[j], rate, "ratings_bellkor", "Allmovie", conn);
+	//					printf("\tRate for movie %d and user %d[%d] is %f\n", movieIds[j], pList[i].id, pList[i].cluster, *rate);
+
+						sprintf(query, "update probe set prediction = %f where movie_id = %d and customer_id = %d;", *rate, movieIds[j], pList[i].id);
+
+						if (mysql_query(conn, query)) {
+							fprintf(stderr, "%s\n", mysql_error(conn));
+							exit(1);
+						}
 					}
 				}
+				if(content) {
+
+					// content based recommendations
+
+					// compare with the medium profile to get the like, dontcare, notlike for each profile
+
+					profile_t meanProf;
+					meanProf.id = 0;
+					getProfile(&meanProf, "profiles_RateCntPer", "Allmovie", conn);
+
+					for (i = 0; i < pListLen; i++) {
+						subProf(&pList[i], &pList[i], &meanProf);
+					}
+				}
+				if(merge) {
+					// combine recommendations
+
+						// get biggest number of likes and smallest number of notlike (create a score for each genre)
+						// look at the options available and choose the ones with this genre
+
+					// send the recommendations for each one, and for the group
+				}
+
 			}
 			printf("\n\n");
-
-
-			// content based recommendations
-
-			// compare with the medium profile to get the like, dontcare, notlike for each profile
-/*
-			profile_t meanProf;
-			meanProf.id = 0;
-			getProfile(&meanProf, "profiles_RateCntPer", "Allmovie", conn);
-
-			for (i = 0; i < pListLen; i++) {
-				subProf(&pList[i], &pList[i], &meanProf);
-			}
-*/
-			// combine recommendations
-
-				// get biggest number of likes and smallest number of notlike (create a score for each genre)
-				// look at the options available and choose the ones with this genre
-
-			// send the recommendations for each one, and for the group
 //			run = 0;
 			free(rate);
 			free(movieIds);

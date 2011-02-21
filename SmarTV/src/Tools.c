@@ -111,7 +111,7 @@ int getIds(int *ids, MYSQL *conn) {
 	int x = 0;
 	int off = 0;
 	//	sprintf(query, "select distinct customer_id from probe limit %d,%d;",x*block+off,block);
-	sprintf(query, "select distinct customer_id from probe where prediction = -1 order by rating limit %d,%d;",x*block+off,block);
+	sprintf(query, "select distinct customer_id from probe where prediction = -1 order by customer_id limit %d,%d;",x*block+off,block);
 //	sprintf(query, "select distinct customer_id from probe where rating = -1 limit %d,%d;",x*block+off,block);
 
 	if (mysql_query(conn, query)) {

@@ -13,7 +13,7 @@ int getRate(profile_t *profile, int idMovie, float *rate, char *rateDb, char *mo
 
 	char query[4098];
 	sprintf(query, "select sum(rating) / count(rating) as meanRate, count(rating) as countRate from %s where movie_id = %d "
-			"and customer_id in "
+			"and status = 1 and customer_id in "
 			"(select customer_id from profiles_Data_%s where cluster = %d);",
 			rateDb, idMovie, movieDb, profile->cluster);
 
@@ -37,11 +37,11 @@ int getRate(profile_t *profile, int idMovie, float *rate, char *rateDb, char *mo
 				*rate = atof(row[0]);
 			}
 			else
-				*rate = -1;
+				*rate = -2;
 		}
 	}
 	else
-		*rate = -1;
+		*rate = -3;
 
 	mysql_free_result(res);
 
