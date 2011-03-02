@@ -1,3 +1,5 @@
+#ifdef __CUDACC__
+
 /**
 * GPU Quicksort Kernels
 * ---------------------
@@ -34,6 +36,8 @@ extern __shared__ unsigned int sarray[];
 #ifdef HASATOMICS
 __device__ unsigned int ohtotal = 0;
 #endif
+
+
 
 /**
 * Swaps the location of two unsigned ints
@@ -659,3 +663,32 @@ __global__ void lqsort(unsigned int* adata, unsigned int* adata2, LQSortParams* 
 
 	__syncthreads();
 }
+
+
+
+extern "C" {
+	void cuda_part1(element* data, Params* params, Hist* hists, Length* length, int paramsize, int threads) {
+		part1<<< paramsize, threads, (threads+1)*2*4+threads*2*4 >>>(data,params,hists,length);
+	}
+}
+
+extern "C" {
+	void cuda_part2(element* data, element* data2, Params* params, Hist* hists, Length* length, int paramsize, int threads) {
+		part2<<< paramsize, threads >>>(data,data2,params,hists,length);
+	}
+}
+
+extern "C" {
+	void cuda_part3(element* data, Params* params, Hist* hists, Length* length, int paramsize, int threads) {
+		part3<<< paramsize, threads >>>(data,params,hists,length);
+	}
+}
+
+extern "C" {
+	void cuda_lqsort(element* data, element* data2, LQSortParams* lqparams, int phase, int worksize, int threads, int sbsize) {
+		lqsort<<< worksize, threads, max((threads+1)*2*4,sbsize*4) >>>(data,data2,lqparams,phase);
+	}
+}
+
+#endif
+

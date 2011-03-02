@@ -14,9 +14,11 @@
 #define BUILDING_DLL
 
 #include "stdio.h"
+#include "math.h"
+#include "string.h"
 #include "sscc_gpuqsort.h"
 
-#include "simpletimer.cu"
+//#include "simpletimer.cu"
 
 #include <algorithm>
 
@@ -30,11 +32,51 @@
 int err;
 
 bool errCheck(int e) {
-	if(e==cudaSuccess)
+/*	if(e==cudaSuccess)
 		return true;
 
-	err = e;
+	err = e;*/
 	return false;
+}
+
+
+element max(element a, element b) {
+	if(a>b)
+		return a;
+	else
+		return b;
+}
+
+element min(element a, element b) {
+	if(a<b)
+		return a;
+	else
+		return b;
+}
+
+
+#pragma omp target device (cuda) copy_deps
+#pragma omp task inout([size]data, [paramsize]params)
+void task_part1(element* data, int size, Params* params, Hist* hists, Length* length, int paramsize, int threads) {
+	cuda_part1(data, params, hists, length, paramsize, threads);
+}
+
+#pragma omp target device (cuda) copy_deps
+#pragma omp task inout([size]data, [size]data2, [paramsize]params)
+void task_part2(element* data, element* data2, int size, Params* params, Hist* hists, Length* length, int paramsize, int threads) {
+	cuda_part2(data, data2, params, hists, length, paramsize, threads);
+}
+
+#pragma omp target device (cuda) copy_deps
+#pragma omp task inout([size]data, [paramsize]params)
+void task_part3(element* data, int size, Params* params, Hist* hists, Length* length, int paramsize, int threads) {
+	cuda_part3(data, params, hists, length, paramsize, threads);
+}
+
+#pragma omp target device (cuda) copy_deps
+#pragma omp task inout([size]data, [size]data2, [2048]lqparams)
+void task_lqsort(element* data, element* data2, int size, LQSortParams* lqparams, int phase, int paramsize, int threads, int sbsize) {
+	cuda_lqsort(data, data2, lqparams, phase, paramsize, threads, sbsize);
 }
 
 
@@ -49,17 +91,22 @@ bool errCheck(int e) {
 int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int blockscount, unsigned int threads, unsigned int sbsize, unsigned int phase)
 {
 
+//#pragma omp start
+
 	//Metodos
+	element* data2;
+
 	element* ddata;
 	element* ddata2;
+
 	Params* params;
-	Params* dparams;
+//	Params* dparams;
 
 	LQSortParams* lqparams;
-	LQSortParams* dlqparams;
+//	LQSortParams* dlqparams;
 
 	Hist* dhists;
-	Length* dlength;
+//	Length* dlength;
 	Length* length;
 	BlockSize* workset;
 
@@ -71,7 +118,7 @@ int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int 
 	// Construtor
 
 
-	cudaDeviceProp deviceProp;
+/*	cudaDeviceProp deviceProp;
 	cudaGetDeviceProperties(&deviceProp, 0);
 	if(!strcmp(deviceProp.name,"GeForce 8800 GTX"))
 	{
@@ -93,24 +140,32 @@ int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int 
 		SM = 202.666666667f;
 	}
 	else
-	{
+	{*/
 		TK = 0;
 		TM = 128;
 		MK = 0;
 		MM = 512;
 		SK = 0;
 		SM = 512;
-	}
-
+//	}
+/*
 	if(cudaMallocHost((void**)&workset,MAXBLOCKS*2*sizeof(BlockSize))!=cudaSuccess) return -1;
 	if(cudaMallocHost((void**)&params,MAXBLOCKS*sizeof(Params))!=cudaSuccess) return -1;
 	if(cudaMallocHost((void**)&length,sizeof(Length))!=cudaSuccess) return -1;
 	if(cudaMallocHost((void**)&lqparams,MAXBLOCKS*sizeof(LQSortParams))!=cudaSuccess) return -1;
+*/
+	workset = (BlockSize *) malloc(MAXBLOCKS*2*sizeof(BlockSize));
+	params = (Params *) malloc(MAXBLOCKS*sizeof(Params));
+	length = (Length *) malloc(sizeof(Length));
+	lqparams = (LQSortParams *) malloc(MAXBLOCKS*sizeof(LQSortParams));
+
+
+/*
 	if(cudaMalloc((void**)&dlqparams,MAXBLOCKS*sizeof(LQSortParams))!=cudaSuccess) return -1;
 	if(cudaMalloc((void**)&dhists,sizeof(Hist))!=cudaSuccess) return -1;
 	if(cudaMalloc((void**)&dlength,sizeof(Length))!=cudaSuccess) return -1;
 	if(cudaMalloc((void**)&dparams,MAXBLOCKS*sizeof(Params))!=cudaSuccess) return -1;
-
+*/
 	init = true;
 
 
@@ -126,7 +181,7 @@ int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int 
 		blockscount = 1<<(int)round(log(size * MK + MM)/log(2.0));
 		sbsize    = 1<<(int)round(log(size * SK + SM)/log(2.0));
 	}
-
+/*
 #ifdef HASATOMICS
 		unsigned int* doh;
 		unsigned int oh;
@@ -135,33 +190,37 @@ int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int 
 		oh=0;
 		cudaMemcpy(doh,&oh,4,cudaMemcpyHostToDevice);
 #endif
-
+*/
 	if(threads>MAXTHREADS)
 		return 1;
 
 	if(blockscount>MAXBLOCKS)
 		return 1;
 
-	SimpleTimer st;
+//	SimpleTimer st;
 
 	// Copy the data to the graphics card and create an auxiallary array
 	ddata2 = 0; ddata = 0;
+
+	data2 = (element *) malloc((size)*sizeof(element));
+/*
 	if(!errCheck(cudaMalloc((void**)&ddata2,(size)*sizeof(element))))
 		return 1;
 	if(!errCheck(cudaMalloc((void**)&ddata,(size)*sizeof(element))))
 		return 1;
 	if(!errCheck(cudaMemcpy(ddata, data, size*sizeof(element), cudaMemcpyHostToDevice) ))
 		return 1;
+*/
 
-
-	if(timerValue!=0)
+/*	if(timerValue!=0)
 	{
 		// Start measuring time
-		cudaThreadSynchronize();
+#pragma omp taskwait
+//		cudaThreadSynchronize();
 
 		st.start();
 	}
-
+*/
 	// We start with a set containg only the sequence to be sorted
 	// This will grow as we partition the data
 	workset[0].beg = 0;
@@ -218,19 +277,20 @@ int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int 
 
 		if(paramsize==0)
 			break;
-
+/*
 		// Copy the block assignment to the GPU
 		if(!errCheck(cudaMemcpy(dparams, params, paramsize*sizeof(Params), cudaMemcpyHostToDevice) ))
 			return 1;
-
+*/
 		// Do the cumulative sum
 		if(flip)
-			part1<<< paramsize, THREADS, (THREADS+1)*2*4+THREADS*2*4 >>>(ddata,dparams,dhists,dlength);
+			task_part1(data, size, params, dhists, length, paramsize, THREADS);
 		else
-			part1<<< paramsize, THREADS, (THREADS+1)*2*4+THREADS*2*4 >>>(ddata2,dparams,dhists,dlength);
+			task_part1(data2, size, params, dhists, length, paramsize, THREADS);
+/*
 		if(!errCheck((cudaMemcpy(length, dlength,sizeof(Length) , cudaMemcpyDeviceToHost) )))
 			return 1;
-
+*/
 		// Do the block cumulative sum. Done on the CPU since not all cards have support for
 		// atomic operations yet.
 		for(unsigned int i=0;i<paramsize;i++)
@@ -253,19 +313,19 @@ int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int 
 
 
 		}
-
+/*
 		// Copy the result of the block cumulative sum to the GPU
 		if(!errCheck((cudaMemcpy(dlength, length, sizeof(Length), cudaMemcpyHostToDevice) )))
 			return 1;
-
+*/
 		// Move the elements to their correct position
 		if(flip)
-			part2<<< paramsize, THREADS >>>(ddata,ddata2,dparams,dhists,dlength);
+			task_part2(data, data2, size, params, dhists, length, paramsize, THREADS);
 		else
-			part2<<< paramsize, THREADS >>>(ddata2,ddata,dparams,dhists,dlength);
+			task_part2(data2, data, size, params, dhists, length, paramsize, THREADS);
 
 		// Fill in the pivot value between the left and right blocks
-		part3<<< paramsize, THREADS >>>(ddata,dparams,dhists,dlength);
+		task_part3(data, size, params, dhists, length, paramsize, THREADS);
 
 		flip = !flip;
 
@@ -321,43 +381,45 @@ int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int 
 			lqparams[i].flip = workset[q].flip;
 			lqparams[i].sbsize = sbsize;
 		}
-
+/*
 		if(!errCheck((cudaMemcpy(dlqparams, lqparams, worksize*sizeof(LQSortParams), cudaMemcpyHostToDevice) )))
 			return 1;
+*/
 
 		// Run the local quicksort, the one that doesn't need inter-block synchronization
 		if(phase!=1)
-			lqsort<<< worksize, THREADS, max((THREADS+1)*2*4,sbsize*4) >>>(ddata,ddata2,dlqparams,phase);
+			task_lqsort(data, data2, size, lqparams, phase, worksize, THREADS, sbsize);
 	}
 
-	cudaThreadSynchronize();
-
+#pragma omp taskwait
+/*
 	if(timerValue!=0)
 	{
 		// Measure the time taken
 		*timerValue = st.end();
 	}
+*/
+#pragma omp taskwait
 
-	err = cudaThreadSynchronize();
 	// Free the data
-	if(err!=cudaSuccess)
+/*	if(err!=cudaSuccess)
 	{
 		cudaFree(ddata);
 		cudaFree(ddata2);
 		return 1;
-	}
+	}*/
 
 	// Copy the result back to the CPU
-	if(!errCheck((cudaMemcpy(data, ddata, size*sizeof(element), cudaMemcpyDeviceToHost) )))
+/*	if(!errCheck((cudaMemcpy(data, ddata, size*sizeof(element), cudaMemcpyDeviceToHost) )))
 		return 1;
 
 	cudaFree(ddata);
 	cudaFree(ddata2);
-
+*/
 
 
 	// Destrutor
-
+/*
 	cudaFreeHost(workset);
 	cudaFreeHost(params);
 	cudaFreeHost(length);
@@ -366,7 +428,7 @@ int gpuqsort(element* data, unsigned int size, double* timerValue, unsigned int 
 	cudaFree(dlqparams);
 	cudaFree(dhists);
 	cudaFree(dlength);
-
+*/
 
 	return 0;
 }
@@ -450,11 +512,6 @@ int main() {
 	}
 
 }
-
-
-
-
-
 
 
 
