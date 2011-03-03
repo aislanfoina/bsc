@@ -54,6 +54,10 @@ element min(element a, element b) {
 		return b;
 }
 
+extern "C" void cuda_part1(element* data, Params* params, Hist* hists, Length* length, int paramsize, int threads);
+extern "C" void cuda_part2(element* data, element* data2, Params* params, Hist* hists, Length* length, int paramsize, int threads);
+extern "C" void cuda_part3(element* data, Params* params, Hist* hists, Length* length, int paramsize, int threads);
+extern "C" void cuda_lqsort(element* data, element* data2, LQSortParams* lqparams, int phase, int worksize, int threads, int sbsize);
 
 #pragma omp target device (cuda) copy_deps
 #pragma omp task inout([size]data, [paramsize]params)
