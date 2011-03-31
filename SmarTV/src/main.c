@@ -47,6 +47,25 @@ double time_int(int print) {
         return elapsed_seconds;
 }
 
+double rate_speed(int print, int rates) {
+
+        double elapsed_seconds = 0;
+        static struct timeval t1; /* var for previous time stamp */
+        static struct timeval t2; /* var of current time stamp */
+
+        if (gettimeofday(&t2, NULL) == -1) {
+                perror("gettimeofday");
+                exit(9);
+        }
+
+        if (print) {
+                elapsed_seconds = (t2.tv_sec - t1.tv_sec) + (t2.tv_usec - t1.tv_usec) * 1e-6;
+                printf("Rates per seconds = %.2f r/s \n", rates/elapsed_seconds);
+        }
+
+        t1 = t2;
+        return elapsed_seconds;
+}
 
 int main(void) {
 	int run = 1;
@@ -59,6 +78,9 @@ int main(void) {
 	int pListChange;
 
 	int i;
+	int total_rate_cnt = 0;
+
+#ifdef USE_MYSQL
 
 	MYSQL *conn;
 	MYSQL_RES *res;
@@ -66,8 +88,10 @@ int main(void) {
 
 	char *server = "localhost";
 	char *user = "root";
-	char *password = "root"; /* set me first */
+	char *password = "root"; // set me first
 	char *database = "sandbox";
+
+	int chunk_size = 1;
 
 	char query[4098];
 
@@ -78,6 +102,13 @@ int main(void) {
 		fprintf(stderr, "%s\n", mysql_error(conn));
 		exit(1);
 	}
+
+#else
+
+	char *sqlite3_db = "sandbox.db";
+	int chunk_size = 100;
+
+#endif
 
 	printf("Start timer!\n");
 	maintime_int(0);
@@ -102,7 +133,15 @@ int main(void) {
 //				2482738, 676682, 307530, 1228542, 1404976, 2311335, 780341 };
 
 		ids = malloc(400000*sizeof(int));
+
+#ifdef USE_MYSQL
+
 		int numIds = getIds(ids, conn);
+
+#else
+		int numIds = getIds(ids, sqlite3_db);
+
+#endif
 
 		int pListLen = numIds;
 		pList = malloc(pListLen * sizeof(profile_t));
@@ -120,32 +159,42 @@ int main(void) {
 		if(pListChange) {
 			int i;
 			// get all profiles
-			for (i = 0; i < pListLen; i++) {
+			for (i = 0; i < pListLen; i+=chunk_size) {
 
-				if((i%1000) == 0 || i == pListLen-1)
+				if((i%10) == 0 || i == pListLen-1)
 					printf("%d of %d (%f%%) profiles loaded...\n", i, pListLen, ((float)i/(float)(pListLen-1))*100);
-
+#ifdef USE_MYSQL
 				getProfile(&pList[i], "profiles_RateCntPer", "Allmovie", conn);
+#else
+				getProfile(&pList[i], chunk_size, "profiles_RateCntPer", "Allmovie", sqlite3_db);
+#endif
 			}
 
 			float *rate = malloc(sizeof(float));
+			int rate_cnt = 0;
+			rate_speed(0, rate_cnt);
 
 //			int movieId = 1;
 			int *movieIds;
 
 			movieIds = malloc(100000*sizeof(int));
-
 			for (i = 0; i < pListLen; i++) {
 
-				if((i%10) == 0 || i == pListLen-1)
+				if((i%10) == 0 || i == pListLen-1) {
 					printf("%d of %d (%f%%) profiles processed...\n", i, pListLen, ((float)i/(float)(pListLen-1))*100);
-
+					rate_speed(1, rate_cnt);
+					total_rate_cnt += rate_cnt;
+					rate_cnt = 0;
+				}
 				// Collaborative recommendation
 
 				if(collaborative) {
 
+#ifdef USE_MYSQL
 					int numMoviesIds = getMovieIds(&pList[i], movieIds, conn);
-
+#else
+					int numMoviesIds = getMovieIds(&pList[i], movieIds, sqlite3_db);
+#endif
 					int j;
 
 					for (j = 0; j < numMoviesIds; j++) {
@@ -160,15 +209,21 @@ int main(void) {
 	//					}
 	//					free(probeRate);
 
+#ifdef USE_MYSQL
 						getRate(&pList[i], movieIds[j], rate, "ratings_bellkor", "Allmovie", conn);
+						rate_cnt++;
 	//					printf("\tRate for movie %d and user %d[%d] is %f\n", movieIds[j], pList[i].id, pList[i].cluster, *rate);
-
+/*
 						sprintf(query, "update probe set prediction = %f where movie_id = %d and customer_id = %d;", *rate, movieIds[j], pList[i].id);
 
 						if (mysql_query(conn, query)) {
 							fprintf(stderr, "%s\n", mysql_error(conn));
 							exit(1);
-						}
+						}*/
+#else
+						getRate(&pList[i], movieIds[j], rate, "ratings_bellkor", "Allmovie", sqlite3_db);
+						rate_cnt++;
+#endif
 					}
 				}
 				if(content) {
@@ -179,7 +234,10 @@ int main(void) {
 
 					profile_t meanProf;
 					meanProf.id = 0;
+#ifdef USE_MYSQL
 					getProfile(&meanProf, "profiles_RateCntPer", "Allmovie", conn);
+#else
+#endif
 
 					for (i = 0; i < pListLen; i++) {
 						subProf(&pList[i], &pList[i], &meanProf);
@@ -204,11 +262,14 @@ int main(void) {
 		free(ids);
 		free(pList);
 		time_int(1);
-
+		printf("Total rates: %d\n\n", total_rate_cnt);
 
 	}
 	maintime_int(1);
+#ifdef USE_MYSQL
 	mysql_close(conn);
+#else
+#endif
 
 	return EXIT_SUCCESS;
 }

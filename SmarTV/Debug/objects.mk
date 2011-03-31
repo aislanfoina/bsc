@@ -4,4 +4,4 @@
 
 USER_OBJS :=
 
-LIBS := -lmysqlclient -lz -lcrypt -lnsl -lm -lssl -lcrypto
+LIBS := -lmysqlclient -lz -lcrypt -lnsl -lsqlite3 -lm -lssl -lcrypto
