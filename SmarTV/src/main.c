@@ -254,7 +254,7 @@ int main(void) {
 
 			}
 			printf("\n\n");
-//			run = 0;
+			run = 0;
 			free(rate);
 			free(movieIds);
 		}

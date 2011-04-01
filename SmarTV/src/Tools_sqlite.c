@@ -118,13 +118,13 @@ int getIds(int *ids, char *sqlite3_db) {
 
 	char query[4098];
 
-	int block = 1000;
+	int block = 10000;
 	int x = 0;
 	int off = 0;
 
 //	sprintf(query, "select distinct customer_id from probe limit %d,%d;",x*block+off,block);
 //	sprintf(query, "select distinct customer_id from probe where prediction = -2 order by customer_id limit %d,%d;",x*block+off,block);
-	sprintf(query, "select distinct customer_id from probe where prediction = 3 order by customer_id limit %d,%d;",x*block+off,block);
+	sprintf(query, "select distinct customer_id from probe order by customer_id limit %d,%d;",x*block+off,block);
 //	sprintf(query, "select distinct customer_id from probe where rating = -1 limit %d,%d;",x*block+off,block);
 
 	sqlite3_prepare_v2(db, query, -1, &pStmt, 0);

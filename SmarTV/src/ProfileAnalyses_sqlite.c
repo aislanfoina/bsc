@@ -36,7 +36,7 @@ int getProfile(profile_t *profile, int chunk_size, char *type, char *movieDb, ch
 	else
 		run = 0;
 
-	while(run) {
+	while(run && (numrows<chunk_size)) {
 		if(profile[numrows].id == sqlite3_column_int(pStmt, 0)) {
 			profile[numrows].cluster = sqlite3_column_int(pStmt, 1);
 			if(!sqlite3_step(pStmt)==SQLITE_ROW)
@@ -44,9 +44,9 @@ int getProfile(profile_t *profile, int chunk_size, char *type, char *movieDb, ch
 		}
 		else
 			profile[numrows].cluster = 0;
+//		if(numrows+1 >= chunk_size)
+//			run = 0;
 		numrows++;
-		if(numrows > chunk_size)
-			run = 0;
 	}
 
 	sqlite3_finalize(pStmt);
