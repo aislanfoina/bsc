@@ -60,19 +60,19 @@ extern "C" void cuda_part3(element* data, Params* params, Hist* hists, Length* l
 extern "C" void cuda_lqsort(element* data, element* data2, LQSortParams* lqparams, int phase, int worksize, int threads, int sbsize);
 
 #pragma omp target device (cuda) copy_deps
-#pragma omp task inout([size]data, [paramsize]params)
+#pragma omp task inout([size]data, [paramsize]params, [1]hists, [1]length)
 void task_part1(element* data, int size, Params* params, Hist* hists, Length* length, int paramsize, int threads) {
 	cuda_part1(data, params, hists, length, paramsize, threads);
 }
 
 #pragma omp target device (cuda) copy_deps
-#pragma omp task inout([size]data, [size]data2, [paramsize]params)
+#pragma omp task inout([size]data, [size]data2, [paramsize]params, [1]hists, [1]length)
 void task_part2(element* data, element* data2, int size, Params* params, Hist* hists, Length* length, int paramsize, int threads) {
 	cuda_part2(data, data2, params, hists, length, paramsize, threads);
 }
 
 #pragma omp target device (cuda) copy_deps
-#pragma omp task inout([size]data, [paramsize]params)
+#pragma omp task inout([size]data, [paramsize]params, [1]hists, [1]length)
 void task_part3(element* data, int size, Params* params, Hist* hists, Length* length, int paramsize, int threads) {
 	cuda_part3(data, params, hists, length, paramsize, threads);
 }
